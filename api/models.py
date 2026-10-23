@@ -44,13 +44,6 @@ class RunOut(BaseModel):
     error: str | None = None
 
 
-class ScenarioOut(BaseModel):
-    name: str
-    version: str
-    mode: str = Field(description="replay or simulation")
-    description: str
-
-
 class DisruptionTypeOut(BaseModel):
     name: str
     effect: str

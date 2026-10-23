@@ -9,12 +9,14 @@ import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from engine.replay.plan import SourceLoader
 from schema.enums import RunMode
 
 if TYPE_CHECKING:
+    import psycopg
+
     from engine.simulation.spec import ScenarioSpec
 
 log = logging.getLogger("sc_livesim.engine")
@@ -92,3 +94,62 @@ def _registry() -> dict[str, Scenario]:
 
 
 SCENARIOS = _registry()
+"""Built-in scenarios (dataset replays and the files in scenarios/)."""
+
+
+def _from_spec(spec: "ScenarioSpec") -> Scenario:
+    from engine.simulation.model import SimulationLoader
+
+    return Scenario(
+        spec.name,
+        spec.version,
+        RunMode.SIMULATION,
+        spec.description.strip(),
+        lambda: SimulationLoader(spec),
+        lambda: spec,
+    )
+
+
+def get_scenario(conn: "psycopg.Connection", name: str) -> Scenario | None:
+    """A built-in scenario, or a custom one stored in the database."""
+    if name in SCENARIOS:
+        return SCENARIOS[name]
+    from engine.simulation.spec import ScenarioSpec
+
+    row = conn.execute("SELECT spec FROM scenario WHERE name = %s", (name,)).fetchone()
+    if row is None:
+        return None
+    return _from_spec(ScenarioSpec.model_validate(row[0]))
+
+
+def list_scenarios(conn: "psycopg.Connection") -> list[tuple[Scenario, str]]:
+    """All scenarios with their origin: built-in, builder, upload or calibration."""
+    from engine.simulation.spec import ScenarioSpec
+
+    result = [(s, "built-in") for s in SCENARIOS.values()]
+    for spec, origin in conn.execute("SELECT spec, origin FROM scenario ORDER BY created_at, name"):
+        result.append((_from_spec(ScenarioSpec.model_validate(spec)), origin))
+    return result
+
+
+def save_scenario(
+    conn: "psycopg.Connection",
+    spec: "ScenarioSpec",
+    origin: str,
+    request: dict[str, Any] | None = None,
+) -> None:
+    """Store a custom scenario. Raises ValueError if the name is taken."""
+    from psycopg.types.json import Jsonb
+
+    if spec.name in SCENARIOS:
+        raise ValueError(f"{spec.name!r} is a built-in scenario")
+    with conn.transaction():
+        exists = conn.execute("SELECT 1 FROM scenario WHERE name = %s", (spec.name,)).fetchone()
+        if exists:
+            raise ValueError(f"scenario {spec.name!r} already exists")
+        conn.execute(
+            "INSERT INTO scenario (name, version, origin, spec, request)"
+            " VALUES (%s, %s, %s, %s, %s)",
+            (spec.name, spec.version, origin, Jsonb(spec.model_dump(mode="json")),
+             Jsonb(request) if request is not None else None),
+        )  # fmt: skip

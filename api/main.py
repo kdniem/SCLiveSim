@@ -22,9 +22,9 @@ from api.models import (
     DisruptionTypeOut,
     RunCreate,
     RunOut,
-    ScenarioOut,
     ShipmentOut,
 )
+from api.scenarios import router as scenarios_router
 from api.settings import Settings
 from api.stream import event_stream
 from api.webhooks import router as webhooks_router
@@ -39,7 +39,6 @@ from engine.control import (
     inject_disruption,
     set_desired_status,
 )
-from engine.scenarios import SCENARIOS
 from engine.simulation.catalog import CATALOG
 from schema import SCHEMA_VERSION
 from schema.enums import EventType, OrderStatus, ShipmentStatus
@@ -83,6 +82,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         expose_headers=["X-SC-LiveSim-Run", "X-SC-LiveSim-Note"],
     )
     _routes(app)
+    app.include_router(scenarios_router)
     app.include_router(webhooks_router)
     return app
 
@@ -126,15 +126,6 @@ def _routes(app: FastAPI) -> None:
     def health(conn: Conn) -> dict[str, str]:
         conn.execute("SELECT 1")
         return {"status": "ok", "engine_version": ENGINE_VERSION, "schema_version": SCHEMA_VERSION}
-
-    @app.get("/scenarios", tags=["runs"])
-    def scenarios() -> list[ScenarioOut]:
-        return [
-            ScenarioOut(
-                name=s.name, version=s.version, mode=s.mode.value, description=s.description
-            )
-            for s in SCENARIOS.values()
-        ]
 
     @app.get("/disruption-types", tags=["disruptions"])
     def disruption_types() -> list[DisruptionTypeOut]:

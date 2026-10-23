@@ -21,7 +21,7 @@ from psycopg.types.json import Jsonb
 from engine.clock import Clock, sim_now
 from engine.replay.plan import ReplaySource, SourceLoader, SourceOptions
 from engine.replay.writer import insert_master_data, write_events
-from engine.scenarios import SCENARIOS
+from engine.scenarios import get_scenario
 from schema.enums import RunStatus
 
 log = logging.getLogger("sc_livesim.engine")
@@ -58,15 +58,18 @@ class ReplayEngine:
         self._loaders: dict[str, SourceLoader] = dict(loaders or {})
         self._sources: dict[str, ReplaySource] = {}
 
-    def _loader(self, scenario: str) -> SourceLoader:
+    def _loader(self, conn: psycopg.Connection, scenario: str) -> SourceLoader:
         if scenario not in self._loaders:
-            self._loaders[scenario] = SCENARIOS[scenario].make_loader()
+            found = get_scenario(conn, scenario)
+            if found is None:
+                raise LookupError(f"scenario {scenario!r} not found")
+            self._loaders[scenario] = found.make_loader()
         return self._loaders[scenario]
 
-    def _source(self, run: dict[str, Any]) -> ReplaySource:
+    def _source(self, conn: psycopg.Connection, run: dict[str, Any]) -> ReplaySource:
         source = self._sources.get(run["id"])
         if source is None:
-            loader = self._loader(run["scenario"])
+            loader = self._loader(conn, run["scenario"])
             source = loader(_options(run["options"], run["seed"]))
             self._sources[run["id"]] = source
             log.info(
@@ -120,7 +123,7 @@ class ReplayEngine:
         options["disruptions"] = applied
         old = self._sources.pop(run["id"], None)
         run["options"] = options
-        source = self._source(run)
+        source = self._source(conn, run)
         cursor = run["cursor"]
         if old is not None and [(e.at, e.type, e.object_id) for e in old.events[:cursor]] != [
             (e.at, e.type, e.object_id) for e in source.events[:cursor]
@@ -149,7 +152,7 @@ class ReplayEngine:
             status, desired = run["status"], run["desired_status"]
 
             if status == RunStatus.CREATED.value:
-                source = self._source(run)
+                source = self._source(conn, run)
                 insert_master_data(
                     conn, source.partners, source.items, source.locations, source.lanes
                 )
@@ -191,7 +194,7 @@ class ReplayEngine:
                 log.info("run %s paused at %s", run_id, current.isoformat())
                 return 0
 
-            source = self._source(run)
+            source = self._source(conn, run)
             offset = run["sim_start"] - source.origin
             start: int = run["cursor"]
             end = start

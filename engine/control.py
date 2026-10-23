@@ -14,7 +14,7 @@ from psycopg.types.json import Jsonb
 
 from engine import ENGINE_VERSION
 from engine.clock import Clock
-from engine.scenarios import SCENARIOS
+from engine.scenarios import get_scenario
 from schema import SCHEMA_VERSION
 from schema.enums import RunStatus
 
@@ -33,8 +33,6 @@ class RunOptions:
     paused: bool = False
 
     def validate(self) -> None:
-        if self.scenario not in SCENARIOS:
-            raise ValueError(f"unknown scenario {self.scenario!r}; known: {sorted(SCENARIOS)}")
         if not 0 < self.time_factor <= MAX_TIME_FACTOR:
             raise ValueError(f"time_factor must be in (0, {MAX_TIME_FACTOR:g}]")
         if not 0 < self.sample_rate <= 1:
@@ -72,7 +70,9 @@ def create_run(conn: psycopg.Connection, options: RunOptions, clock: Clock) -> s
     """Insert a new replay run; the engine starts it on its next tick."""
     options.validate()
     sim_start = (options.sim_start or clock.now()).replace(microsecond=0)
-    scenario = SCENARIOS[options.scenario]
+    scenario = get_scenario(conn, options.scenario)
+    if scenario is None:
+        raise ValueError(f"unknown scenario {options.scenario!r}; see GET /scenarios")
     with conn.transaction():
         run_id = _next_run_id(conn)
         conn.execute(
@@ -158,7 +158,7 @@ def inject_disruption(
         if row is None:
             raise RunNotFound(run_id)
         scenario_name, status, sim_start, options = row
-        scenario = SCENARIOS.get(scenario_name)
+        scenario = get_scenario(conn, scenario_name)
         if scenario is None or not scenario.supports_disruptions:
             raise RunStateError(f"scenario {scenario_name!r} does not support disruptions")
         if status in ("finished", "failed"):
