@@ -15,6 +15,7 @@ It only talks to the REST API, never to the database.
 | `get_shipments`, `get_inventory`, `get_events` | Current state and history (`get_events` pages with `after`) |
 | `get_network`, `list_disruption_types` | Locations, lanes, items and the disruption catalog |
 | `inject_disruption` | Disrupt a running simulation from now on |
+| `builder_options`, `build_scenario` | Generate and save a scenario from industry, region, size, flows and disruptions |
 
 ## Connect
 
@@ -54,6 +55,7 @@ docker compose run --rm -i -e LIVESIM_API_URL=http://api:8000 api python -m mcp_
 Ask your agent, for example:
 
 - "Start a wholesale simulation and tell me which shipments are late."
+- "Build a pharma supply chain in Latin America with high disruption risk and run it."
 - "Close the port on the Shenzhen–Hamburg lane for 10 days and watch what happens
   to headset stock in Hamburg."
 - "Summarise the last disruption and the shipments it delayed."

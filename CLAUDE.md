@@ -40,7 +40,7 @@ sc-livesim/
   scenarios/     YAML templates, one folder each with README (Phase 2)
   adapters/      Importers mapping public datasets to the core schema
   api/           FastAPI app: REST, SSE stream, (later) webhooks
-  mcp/           MCP server (Phase 2)
+  mcp_server/    MCP server (not `mcp/`: that would shadow the MCP SDK package)
   sdk/python/    Client library (Phase 3)
   examples/      Mini control tower, notebook
   docs/          MkDocs site, docs/adr/ for architecture decisions
@@ -96,8 +96,11 @@ In scope:
 - Webhooks (subscriptions, HMAC-signed delivery with retries)
 - MCP server on top of the access layer
 - Control tower shows inventory and disruptions
+- Added at the maintainer's request: a scenario builder (industry, region, size, flows,
+  disruption profile → generated scenario, web page) and dataset continuation (replay a
+  dataset's end, then a simulation calibrated on it; `dataco-continued`, ADR 0005)
 
-Out of scope for Phase 2: calibration from own data, LLM-assisted mapping, Python SDK,
+Out of scope for Phase 2: calibration from users' own data, LLM-assisted mapping, Python SDK,
 auth, public hosting.
 
 Gate: both templates run for 90 simulated days without crashes, same seed → identical

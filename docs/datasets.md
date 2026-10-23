@@ -84,3 +84,34 @@ only appear as pseudonymous `CUS-…` IDs with their segment.
 - `seed` + `sample_rate` (0–1]: seeded sample of orders. Same seed, same sample.
 - `dataset_from` / `dataset_to`: replay only a window of the dataset.
   The run's `sim_start` corresponds to `dataset_from` (default 2015-01-01 00:00).
+
+## Continuing DataCo (calibration)
+
+`dataco-continued` replays the last 30 days of DataCo and continues from the
+first midnight after its last order (2018-02-01) with a simulation calibrated on
+the last 90 days. `POST /scenarios/calibrate` saves such a calibrated scenario
+(any window) to run or edit on its own. Code: `adapters/dataco/calibrate.py`,
+`engine/continuation.py`, ADR 0005.
+
+| Estimated from the data | How |
+| --- | --- |
+| Order rate per destination region × shipping class × product | Orders in the window / days, Poisson arrivals |
+| Order quantity | Mean and coefficient of variation per stream (main line of each order) |
+| Planned transit | `Days for shipment (scheduled)` per shipping class (Same Day: 0.25 days) |
+| Actual transit | Ratio of real to scheduled days and its variability per shipping class |
+
+Checked on the real data (seed 1): the simulation continues at the dataset's
+recent level (about 65 orders per day), with the same shipping class mix and a
+late-delivery share of 64 % (DataCo: 57 %).
+
+Placeholders, because DataCo does not contain the information:
+
+- **Customers** are aggregated per destination region (`CUS-REG-…`).
+- **Origin**: one DC `LOC-DC-DATACO` without coordinates.
+- **Transport mode**: `road` as a placeholder; the real shipping class is kept as
+  the lane's `service` and appears as `shipping_mode` in events.
+- **Inventory**: `unlimited` stock, so no inventory rows or events are produced.
+- **Order lines**: one line per simulated order (the order's highest-value line),
+  so order counts match the data while item volume per order is lower.
+- **Cancellations** (about 4 % of orders) are not simulated.
+- Products outside the top 20 are folded into the others' rates.

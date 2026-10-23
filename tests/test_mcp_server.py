@@ -63,6 +63,10 @@ def test_tools_drive_a_simulation(client: TestClient, conn: psycopg.Connection) 
     active = {d["id"] for d in srv.run_summary(run)["active_disruptions"]}
     assert accepted["id"] in active
 
+    built = srv.build_scenario("food_beverage", "europe", size="small", name="mcp-food")
+    assert built["name"] == "mcp-food"
+    assert "food_beverage" in {i["name"] for i in srv.builder_options()["industries"]}
+
     assert srv.pause_run(run)["desired_status"] == "paused"
     assert srv.resume_run(run)["desired_status"] == "running"
 
@@ -73,4 +77,10 @@ def test_tools_are_registered() -> None:
         return {t.name for t in tools}
 
     registered = anyio.run(names)
-    assert {"run_summary", "inject_disruption", "get_shipments", "start_run"} <= registered
+    assert {
+        "run_summary",
+        "inject_disruption",
+        "get_shipments",
+        "start_run",
+        "build_scenario",
+    } <= registered

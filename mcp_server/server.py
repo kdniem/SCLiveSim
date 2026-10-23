@@ -22,8 +22,10 @@ INSTRUCTIONS = """\
 SC LiveSim streams live supply chain data (orders, shipments, inventory,
 disruptions) from replayed datasets or simulations. All timestamps are simulated
 time (UTC). Start with `list_runs` or `run_summary`. Tools that take `run`
-default to the most recent run. Simulations accept injected disruptions
-(`list_disruption_types`, then `inject_disruption`)."""
+default to the most recent run. Build your own scenario with `builder_options`
+and `build_scenario`, then `start_run`; `dataco-continued` replays a real dataset
+and continues it with a calibrated simulation. Simulations accept injected
+disruptions (`list_disruption_types`, then `inject_disruption`)."""
 
 server: MCPServer = MCPServer(
     name="sc-livesim",
@@ -232,6 +234,40 @@ def inject_disruption(
         {"type": type, "severity": severity, "duration_days": duration_days,
          "lanes": lanes or [], "locations": locations or []},
     )  # fmt: skip
+    return result
+
+
+@server.tool()
+def builder_options() -> dict[str, Any]:
+    """Industries, regions, sizes and disruption profiles for build_scenario."""
+    options: dict[str, Any] = _get("/builder/options")
+    return {k: options[k] for k in ("industries", "regions", "sizes", "disruption_profiles")}
+
+
+@server.tool()
+def build_scenario(
+    industry: str,
+    region: str,
+    size: str = "medium",
+    inbound: bool = True,
+    production: bool = True,
+    disruptions: str = "medium",
+    demand_level: float = 1.0,
+    horizon_days: int = 365,
+    seed: int = 0,
+    name: str | None = None,
+) -> dict[str, Any]:
+    """Generate and save a scenario from a few choices; then start it with start_run.
+
+    industry/region: see builder_options. size: small, medium or large. disruptions:
+    none, low, medium or high. Returns the saved scenario (use its name in start_run).
+    """
+    body = {"industry": industry, "region": region, "size": size, "inbound": inbound,
+            "production": production, "disruptions": disruptions,
+            "demand_level": demand_level, "horizon_days": horizon_days, "seed": seed}  # fmt: skip
+    if name:
+        body["name"] = name
+    result: dict[str, Any] = _post("/scenarios", body)
     return result
 
 
