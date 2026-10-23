@@ -13,8 +13,11 @@ classifiers = [
     "Topic :: Scientific/Engineering",
 ]
 dependencies = [
+    "fastapi>=0.115",
+    "psycopg-pool>=3.2",
     "psycopg[binary]>=3.2",
     "pydantic>=2.9",
+    "uvicorn>=0.32",
 ]
 
 [project.urls]
@@ -25,6 +28,7 @@ dev = [
     "pytest>=8.3",
     "ruff>=0.8",
     "mypy>=1.13",
+    "httpx>=0.27",
 ]
 
 [build-system]
@@ -44,7 +48,7 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["schema", "engine"]
+files = ["schema", "engine", "adapters"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
