@@ -56,3 +56,12 @@ def test_insert_notifies_listeners(db_url: str) -> None:
         notifies = list(listener.notifies(timeout=5, stop_after=1))
     assert len(notifies) == 1
     assert '"type" : "order.created"' in notifies[0].payload
+
+
+def test_migrate_leaves_no_transaction_open(db_url: str) -> None:
+    """A long-lived worker must not keep the migration lock (regression test)."""
+    with psycopg.connect(db_url) as first, psycopg.connect(db_url) as second:
+        migrate(first)
+        assert first.info.transaction_status == psycopg.pq.TransactionStatus.IDLE
+        second.execute("SET lock_timeout = '2s'")
+        assert migrate(second) == []
