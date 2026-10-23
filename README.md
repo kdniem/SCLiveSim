@@ -99,7 +99,8 @@ Inputs (public datasets, later: scenarios, your own data)
 - **Local first.** Everything runs with `docker compose up`; no cloud account needed.
 
 How DataCo is mapped, and which assumptions that needs, is documented in
-[docs/datasets.md](docs/datasets.md). Design decisions are in [docs/adr/](docs/adr/).
+[docs/datasets.md](docs/datasets.md). Design decisions are in [docs/adr/](docs/adr/); the Phase 1 gate results are in
+[docs/phase1-acceptance.md](docs/phase1-acceptance.md).
 
 ## Development
 

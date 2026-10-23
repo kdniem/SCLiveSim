@@ -64,6 +64,10 @@ class ReplayEngine:
             loader = self._loader(run["scenario"])
             source = loader(_options(run["options"], run["seed"]))
             self._sources[run["id"]] = source
+            log.info(
+                "run %s: plan loaded (%d events, continuing at %d)",
+                run["id"], len(source.events), run["cursor"],
+            )  # fmt: skip
         return source
 
     def tick(self, conn: psycopg.Connection) -> int:
