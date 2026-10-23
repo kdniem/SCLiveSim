@@ -16,17 +16,34 @@ from fastapi.responses import StreamingResponse
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
-from api.models import RunCreate, RunOut, ScenarioOut, ShipmentOut
+from api.models import (
+    DisruptionAccepted,
+    DisruptionCreate,
+    DisruptionTypeOut,
+    RunCreate,
+    RunOut,
+    ScenarioOut,
+    ShipmentOut,
+)
 from api.settings import Settings
 from api.stream import event_stream
 from engine import ENGINE_VERSION
 from engine.clock import SystemClock, sim_now
-from engine.control import RunOptions, create_run, get_runs, set_desired_status
+from engine.control import (
+    RunNotFound,
+    RunOptions,
+    RunStateError,
+    create_run,
+    get_runs,
+    inject_disruption,
+    set_desired_status,
+)
 from engine.scenarios import SCENARIOS
+from engine.simulation.catalog import CATALOG
 from schema import SCHEMA_VERSION
 from schema.enums import EventType, OrderStatus, ShipmentStatus
 from schema.migrate import migrate
-from schema.models import Event, Inventory, Order
+from schema.models import Disruption, Event, Inventory, Item, Lane, Location, Order
 
 INVENTORY_NOTE = "DataCo has no inventory data; inventory stays empty in Phase 1."
 MAX_LIMIT = 1000
@@ -110,8 +127,20 @@ def _routes(app: FastAPI) -> None:
 
     @app.get("/scenarios", tags=["runs"])
     def scenarios() -> list[ScenarioOut]:
-        return [ScenarioOut(name=s.name, version=s.version, description=s.description)
-                for s in SCENARIOS.values()]  # fmt: skip
+        return [
+            ScenarioOut(
+                name=s.name, version=s.version, mode=s.mode.value, description=s.description
+            )
+            for s in SCENARIOS.values()
+        ]
+
+    @app.get("/disruption-types", tags=["disruptions"])
+    def disruption_types() -> list[DisruptionTypeOut]:
+        return [
+            DisruptionTypeOut(name=t.name, effect=t.effect, targets=t.targets,
+                              description=t.description)
+            for t in CATALOG.values()
+        ]  # fmt: skip
 
     @app.get("/runs", tags=["runs"])
     def list_runs(conn: Conn) -> list[RunOut]:
@@ -224,6 +253,51 @@ def _routes(app: FastAPI) -> None:
                 (run_id, limit, offset),
             )
             return [Inventory(**r) for r in cur.fetchall()]
+
+    @app.get("/disruptions", tags=["disruptions"])
+    def disruptions(conn: Conn, response: Response, run: RunParam = None) -> list[Disruption]:
+        """Disruptions that have started in a run (ongoing ones have no `end`)."""
+        run_id = _resolve_run(conn, run, response)
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                "SELECT * FROM disruption WHERE sim_run_id = %s ORDER BY start, id", (run_id,)
+            )
+            return [Disruption(**r) for r in cur.fetchall()]
+
+    @app.post("/runs/{run_id}/disruptions", status_code=202, tags=["disruptions"])
+    def post_disruption(run_id: str, body: DisruptionCreate, conn: Conn) -> DisruptionAccepted:
+        """Inject a disruption into a running simulation.
+
+        The engine applies it within one tick and re-plans the run from the
+        current simulated time; nothing that already happened changes.
+        """
+        try:
+            disruption_id = inject_disruption(conn, run_id, **body.model_dump())
+        except RunNotFound as exc:
+            raise HTTPException(404, f"run {run_id} not found") from exc
+        except RunStateError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        return DisruptionAccepted(id=disruption_id, run_id=run_id)
+
+    @app.get("/locations", tags=["master data"])
+    def locations(conn: Conn) -> list[Location]:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("SELECT * FROM location ORDER BY id")
+            return [Location(**r) for r in cur.fetchall()]
+
+    @app.get("/items", tags=["master data"])
+    def items(conn: Conn) -> list[Item]:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("SELECT * FROM item ORDER BY id")
+            return [Item(**r) for r in cur.fetchall()]
+
+    @app.get("/lanes", tags=["master data"])
+    def lanes(conn: Conn) -> list[Lane]:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("SELECT * FROM lane ORDER BY id")
+            return [Lane(**r) for r in cur.fetchall()]
 
     @app.get("/events", tags=["data"])
     def events(

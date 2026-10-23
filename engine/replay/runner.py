@@ -16,6 +16,7 @@ from typing import Any
 
 import psycopg
 from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
 
 from engine.clock import Clock, sim_now
 from engine.replay.plan import ReplaySource, SourceLoader, SourceOptions
@@ -38,6 +39,10 @@ def _options(raw: dict[str, Any], seed: int) -> SourceOptions:
         sample_rate=float(raw.get("sample_rate", 1.0)),
         dataset_from=ts("dataset_from"),
         dataset_to=ts("dataset_to"),
+        disruptions=tuple(
+            {k: v for k, v in d.items() if k != "requested_start_day"}
+            for d in raw.get("disruptions", [])
+        ),
     )
 
 
@@ -95,6 +100,39 @@ class ReplayEngine:
                 (f"{type(exc).__name__}: {exc}", run_id),
             )
 
+    def _apply_disruptions(
+        self, conn: psycopg.Connection, run: dict[str, Any], now: datetime
+    ) -> None:
+        """Add injected disruptions to a simulation and re-plan it.
+
+        Each disruption starts no earlier than just after the run's current
+        simulated time. The simulation is deterministic, so every event before
+        that point (all events already written) stays exactly the same.
+        """
+        current = sim_now(run["sim_position"], run["wall_anchor"], run["time_factor"], now)
+        elapsed_days = (current - run["sim_start"]).total_seconds() / 86400 + 1 / 86400
+        options = dict(run["options"])
+        applied = list(options.get("disruptions", []))
+        for pending in options.pop("pending_disruptions"):
+            requested = pending.get("requested_start_day")
+            start_day = max(requested if requested is not None else 0.0, elapsed_days)
+            applied.append({**pending, "start_day": round(start_day, 6)})
+        options["disruptions"] = applied
+        old = self._sources.pop(run["id"], None)
+        run["options"] = options
+        source = self._source(run)
+        cursor = run["cursor"]
+        if old is not None and [(e.at, e.type, e.object_id) for e in old.events[:cursor]] != [
+            (e.at, e.type, e.object_id) for e in source.events[:cursor]
+        ]:
+            raise RuntimeError("re-planned simulation diverges from events already written")
+        conn.execute(
+            "UPDATE run_control SET options = %s, events_total = %s, updated_at = now()"
+            " WHERE sim_run_id = %s",
+            (Jsonb(options), len(source.events), run["id"]),
+        )
+        log.info("run %s: %d disruption(s) injected, plan rebuilt", run["id"], len(applied))
+
     def _step(self, conn: psycopg.Connection, run_id: str) -> int:
         with conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
@@ -112,7 +150,9 @@ class ReplayEngine:
 
             if status == RunStatus.CREATED.value:
                 source = self._source(run)
-                insert_master_data(conn, source.partners, source.items)
+                insert_master_data(
+                    conn, source.partners, source.items, source.locations, source.lanes
+                )
                 running = desired == "running"
                 conn.execute(
                     "UPDATE sim_run SET status = %s, wall_start = %s WHERE id = %s",
@@ -125,6 +165,9 @@ class ReplayEngine:
                 )
                 log.info("run %s started with %d planned events", run_id, len(source.events))
                 return 0
+
+            if run["options"].get("pending_disruptions"):
+                self._apply_disruptions(conn, run, now)
 
             if status == RunStatus.PAUSED.value:
                 if desired == "running":

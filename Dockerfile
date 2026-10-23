@@ -21,6 +21,7 @@ COPY engine ./engine
 COPY adapters ./adapters
 COPY api ./api
 COPY examples ./examples
+COPY scenarios ./scenarios
 RUN uv sync --frozen --no-dev
 
 
