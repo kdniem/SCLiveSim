@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: livesim
+          POSTGRES_PASSWORD: livesim
+          POSTGRES_DB: livesim
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U livesim"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    env:
+      DATABASE_URL: postgresql://livesim:livesim@localhost:5432/livesim
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy
+      - run: uv run pytest
+
+  compose-smoke:
+    # Builds the images and checks that the stack starts. The dataset download
+    # and autostart are disabled to keep CI independent of Mendeley Data.
+    runs-on: ubuntu-latest
+    env:
+      LIVESIM_AUTOSTART: ""
+      DATACO_AUTO_DOWNLOAD: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose up -d --build
+      - name: Wait for API and control tower
+        run: |
+          for i in $(seq 1 60); do
+            curl -fsS http://localhost:8000/health && break
+            sleep 2
+          done
+          curl -fsS http://localhost:8000/openapi.json > /dev/null
+          curl -fsS http://localhost:8080/ | grep -q "Mini Control Tower"
+          curl -fsS http://localhost:8000/scenarios
+      - if: failure()
+        run: docker compose logs
+      - if: always()
+        run: docker compose down -v

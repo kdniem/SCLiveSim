@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kdniem/SCLiveSim/schema/v0.1.0/order.json",
+  "x-schema-version": "0.1.0",
+  "$defs": {
+    "OrderDirection": {
+      "enum": [
+        "inbound",
+        "outbound"
+      ],
+      "title": "OrderDirection",
+      "type": "string"
+    },
+    "OrderStatus": {
+      "enum": [
+        "created",
+        "confirmed",
+        "shipped",
+        "delivered",
+        "cancelled"
+      ],
+      "title": "OrderStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "sim_run_id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "title": "Sim Run Id",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "title": "Id",
+      "type": "string"
+    },
+    "direction": {
+      "$ref": "#/$defs/OrderDirection"
+    },
+    "partner_id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "title": "Partner Id",
+      "type": "string"
+    },
+    "order_date": {
+      "format": "date-time",
+      "title": "Order Date",
+      "type": "string"
+    },
+    "requested_date": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Requested Date"
+    },
+    "status": {
+      "$ref": "#/$defs/OrderStatus"
+    },
+    "attributes": {
+      "additionalProperties": true,
+      "title": "Attributes",
+      "type": "object"
+    }
+  },
+  "required": [
+    "sim_run_id",
+    "id",
+    "direction",
+    "partner_id",
+    "order_date",
+    "status"
+  ],
+  "title": "Order",
+  "type": "object"
+}

@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kdniem/SCLiveSim/schema/v0.1.0/inventory.json",
+  "x-schema-version": "0.1.0",
+  "additionalProperties": false,
+  "properties": {
+    "sim_run_id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "title": "Sim Run Id",
+      "type": "string"
+    },
+    "location_id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "title": "Location Id",
+      "type": "string"
+    },
+    "item_id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "title": "Item Id",
+      "type": "string"
+    },
+    "on_hand": {
+      "title": "On Hand",
+      "type": "string"
+    },
+    "reserved": {
+      "default": "0",
+      "title": "Reserved",
+      "type": "string"
+    },
+    "in_transit": {
+      "default": "0",
+      "title": "In Transit",
+      "type": "string"
+    },
+    "as_of": {
+      "format": "date-time",
+      "title": "As Of",
+      "type": "string"
+    }
+  },
+  "required": [
+    "sim_run_id",
+    "location_id",
+    "item_id",
+    "on_hand",
+    "as_of"
+  ],
+  "title": "Inventory",
+  "type": "object"
+}
