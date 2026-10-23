@@ -127,3 +127,21 @@ footer a { color: var(--accent); }
 @media (prefers-reduced-motion: reduce) {
   tr.flash { animation: none; }
 }
+
+select {
+  font: inherit;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  max-width: 100%;
+}
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}
+.ok { color: var(--ok); }
+.disruptions { margin: 0; padding-left: 18px; }
+.disruptions li { padding: 3px 0; }
+.disruptions strong { color: var(--alert); text-transform: capitalize; }
