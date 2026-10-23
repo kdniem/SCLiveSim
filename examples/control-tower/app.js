@@ -226,6 +226,12 @@ function setConn(online) {
   $("conn").className = `pill ${online ? "pill-on" : "pill-off"}`;
 }
 
+async function loadNames() {
+  const [locations, items] = await Promise.all([api("/locations"), api("/items")]);
+  locations.forEach((l) => names.locations.set(l.id, l.name));
+  items.forEach((i) => names.items.set(i.id, i.name));
+}
+
 async function refreshSide() {
   if (!run) return;
   const gen = generation;
@@ -234,6 +240,10 @@ async function refreshSide() {
       api(`/inventory?run=${run.id}&limit=1000`), api(`/disruptions?run=${run.id}`),
     ]);
     if (gen !== generation) return;
+    // Master data of a newly started run may not have been loaded yet.
+    if (inventory.some((r) => !names.locations.has(r.location_id) || !names.items.has(r.item_id))) {
+      await loadNames();
+    }
     renderInventory(inventory);
     renderDisruptions(disruptions);
   } catch (err) {
@@ -316,9 +326,7 @@ async function start() {
     setTimeout(start, 3000);
     return;
   }
-  const [locations, items] = await Promise.all([api("/locations"), api("/items")]);
-  locations.forEach((l) => names.locations.set(l.id, l.name));
-  items.forEach((i) => names.items.set(i.id, i.name));
+  await loadNames();
 
   const wanted = params.get("run");
   const active = runs.filter((r) => ["created", "running", "paused"].includes(r.status));
