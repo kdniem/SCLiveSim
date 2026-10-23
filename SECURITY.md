@@ -10,6 +10,10 @@ SC LiveSim is a local test-data engine. Phase 1 has **no authentication** and is
 not meant to be exposed to the internet. Running it on a public host is at your
 own risk.
 
+Webhooks POST event data to any URL that is registered through the API, and
+their signing secrets are stored in the database in plain text. Only register
+endpoints you control.
+
 ## Reporting a vulnerability
 
 Please do **not** open a public issue. Use GitHub's

@@ -27,6 +27,7 @@ from api.models import (
 )
 from api.settings import Settings
 from api.stream import event_stream
+from api.webhooks import router as webhooks_router
 from engine import ENGINE_VERSION
 from engine.clock import SystemClock, sim_now
 from engine.control import (
@@ -77,11 +78,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(settings.cors_origins),
-        allow_methods=["GET", "POST"],
+        allow_methods=["GET", "POST", "DELETE"],
         allow_headers=["*"],
         expose_headers=["X-SC-LiveSim-Run", "X-SC-LiveSim-Note"],
     )
     _routes(app)
+    app.include_router(webhooks_router)
     return app
 
 

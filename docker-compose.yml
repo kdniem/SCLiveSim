@@ -48,6 +48,16 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  webhooks:
+    build: .
+    command: ["python", "-m", "api.webhooks"]
+    environment:
+      <<: *app-env
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
   control-tower:
     build: .
     command: ["python", "-m", "http.server", "8080", "--directory", "examples/control-tower"]
