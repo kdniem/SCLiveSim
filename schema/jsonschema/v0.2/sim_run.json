@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kdniem/SCLiveSim/schema/v0.2.0/sim_run.json",
+  "x-schema-version": "0.2.0",
+  "$defs": {
+    "RunMode": {
+      "enum": [
+        "replay",
+        "simulation",
+        "calibration"
+      ],
+      "title": "RunMode",
+      "type": "string"
+    },
+    "RunStatus": {
+      "enum": [
+        "created",
+        "running",
+        "paused",
+        "finished",
+        "failed"
+      ],
+      "title": "RunStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "title": "Id",
+      "type": "string"
+    },
+    "mode": {
+      "$ref": "#/$defs/RunMode"
+    },
+    "scenario": {
+      "title": "Scenario",
+      "type": "string"
+    },
+    "scenario_version": {
+      "title": "Scenario Version",
+      "type": "string"
+    },
+    "seed": {
+      "title": "Seed",
+      "type": "integer"
+    },
+    "time_factor": {
+      "exclusiveMinimum": 0,
+      "title": "Time Factor",
+      "type": "number"
+    },
+    "sim_start": {
+      "format": "date-time",
+      "title": "Sim Start",
+      "type": "string"
+    },
+    "wall_start": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Wall Start"
+    },
+    "status": {
+      "$ref": "#/$defs/RunStatus"
+    },
+    "engine_version": {
+      "title": "Engine Version",
+      "type": "string"
+    },
+    "schema_version": {
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "mode",
+    "scenario",
+    "scenario_version",
+    "seed",
+    "time_factor",
+    "sim_start",
+    "status",
+    "engine_version",
+    "schema_version"
+  ],
+  "title": "SimRun",
+  "type": "object"
+}
