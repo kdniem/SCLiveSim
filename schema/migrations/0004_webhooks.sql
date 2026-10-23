@@ -23,8 +23,9 @@ CREATE TABLE webhook_delivery (
     last_error       text,
     created_at       timestamptz NOT NULL DEFAULT now(),
     delivered_at     timestamptz,
-    PRIMARY KEY (webhook_id, sim_run_id, event_id),
-    FOREIGN KEY (sim_run_id, event_id) REFERENCES event (sim_run_id, id)
+    -- No foreign key to event: events are never deleted, and a reference would
+    -- make TRUNCATE fail before the append-only trigger can reject it.
+    PRIMARY KEY (webhook_id, sim_run_id, event_id)
 );
 CREATE INDEX webhook_delivery_due_idx ON webhook_delivery (next_attempt_at)
     WHERE status = 'pending';
