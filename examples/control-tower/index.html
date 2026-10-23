@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mini Control Tower · SC LiveSim</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <h1>Mini Control Tower</h1>
+      <span class="sub">SC LiveSim example consumer</span>
+    </div>
+    <div class="run">
+      <span id="conn" class="pill pill-off" title="Stream connection">offline</span>
+      <span id="run-id" class="mono">–</span>
+      <span id="run-status" class="pill">–</span>
+      <span class="clock" title="Simulated time (UTC)">
+        <span class="label">sim time</span>
+        <span id="sim-time" class="mono">–</span>
+      </span>
+      <button id="toggle" type="button" disabled>Pause</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="kpis" aria-label="Key figures">
+      <div class="kpi"><span class="kpi-label">Open shipments</span><span id="kpi-open" class="kpi-value">–</span></div>
+      <div class="kpi kpi-alert"><span class="kpi-label">Delayed</span><span id="kpi-delayed" class="kpi-value">–</span></div>
+      <div class="kpi"><span class="kpi-label">Delayed share</span><span id="kpi-share" class="kpi-value">–</span></div>
+      <div class="kpi"><span class="kpi-label">Delivered (this session)</span><span id="kpi-delivered" class="kpi-value">0</span></div>
+    </section>
+
+    <section class="panel">
+      <h2>Delayed shipments <span id="delayed-count" class="count"></span></h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Shipment</th><th>Destination</th><th>Mode</th><th>Planned ETA</th><th>Current ETA</th><th>Delay</th></tr></thead>
+          <tbody id="delayed-body"><tr class="empty"><td colspan="6">No delayed shipments.</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Open shipments <span id="open-count" class="count"></span></h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Shipment</th><th>Destination</th><th>Mode</th><th>Departed</th><th>Planned ETA</th><th>Status</th></tr></thead>
+          <tbody id="open-body"><tr class="empty"><td colspan="6">No open shipments.</td></tr></tbody>
+        </table>
+      </div>
+      <p class="hint">Showing the 100 most recent. All data is replayed from the public DataCo dataset (CC BY 4.0).</p>
+    </section>
+
+    <section class="panel">
+      <h2>Live events</h2>
+      <ol id="events" class="events" aria-live="polite"></ol>
+    </section>
+  </main>
+
+  <footer>
+    API: <a id="api-link" href="#"></a> · Change it with <code>?api=http://host:port</code>
+  </footer>
+  <script src="app.js"></script>
+</body>
+</html>

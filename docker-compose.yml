@@ -1,3 +1,9 @@
+# `docker compose up` starts PostgreSQL, the replay engine, the API and the
+# example control tower. On first start the engine downloads the DataCo
+# dataset (96 MB, CC BY 4.0) into ./data/raw and starts a replay at 1440x.
+x-app-env: &app-env
+  DATABASE_URL: postgresql://${POSTGRES_USER:-livesim}:${POSTGRES_PASSWORD:-livesim}@db:5432/${POSTGRES_DB:-livesim}
+
 services:
   db:
     image: postgres:16-alpine
@@ -14,6 +20,41 @@ services:
       interval: 2s
       timeout: 3s
       retries: 30
+
+  engine:
+    build: .
+    command: ["python", "-m", "engine"]
+    environment:
+      <<: *app-env
+      LIVESIM_AUTOSTART: ${LIVESIM_AUTOSTART-dataco}
+      LIVESIM_AUTOSTART_TIME_FACTOR: ${LIVESIM_AUTOSTART_TIME_FACTOR:-1440}
+      LIVESIM_AUTOSTART_SEED: ${LIVESIM_AUTOSTART_SEED:-42}
+      DATACO_AUTO_DOWNLOAD: ${DATACO_AUTO_DOWNLOAD:-true}
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  api:
+    build: .
+    environment:
+      <<: *app-env
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  control-tower:
+    build: .
+    command: ["python", "-m", "http.server", "8080", "--directory", "examples/control-tower"]
+    ports:
+      - "${CONTROL_TOWER_PORT:-8080}:8080"
+    depends_on:
+      - api
 
 volumes:
   pgdata:

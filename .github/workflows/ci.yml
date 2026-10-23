@@ -29,3 +29,27 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run mypy
       - run: uv run pytest
+
+  compose-smoke:
+    # Builds the images and checks that the stack starts. The dataset download
+    # and autostart are disabled to keep CI independent of Mendeley Data.
+    runs-on: ubuntu-latest
+    env:
+      LIVESIM_AUTOSTART: ""
+      DATACO_AUTO_DOWNLOAD: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose up -d --build
+      - name: Wait for API and control tower
+        run: |
+          for i in $(seq 1 60); do
+            curl -fsS http://localhost:8000/health && break
+            sleep 2
+          done
+          curl -fsS http://localhost:8000/openapi.json > /dev/null
+          curl -fsS http://localhost:8080/ | grep -q "Mini Control Tower"
+          curl -fsS http://localhost:8000/scenarios
+      - if: failure()
+        run: docker compose logs
+      - if: always()
+        run: docker compose down -v
