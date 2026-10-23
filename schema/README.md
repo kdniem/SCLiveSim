@@ -44,3 +44,9 @@ Agreed with the maintainer before implementation:
 - `engine_version` and `schema_version` added to `sim_run` for reproducibility.
 - Shipment status values: `planned`, `picked_up`, `in_transit`, `delayed`,
   `delivered`, `cancelled`.
+
+## Changelog
+
+- **0.2.0**: new event type `inventory.changed` (initial stock, production),
+  migration `0003`. Backwards compatible.
+- **0.1.0**: first version.

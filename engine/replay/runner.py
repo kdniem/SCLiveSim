@@ -16,11 +16,12 @@ from typing import Any
 
 import psycopg
 from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
 
 from engine.clock import Clock, sim_now
 from engine.replay.plan import ReplaySource, SourceLoader, SourceOptions
 from engine.replay.writer import insert_master_data, write_events
-from engine.scenarios import SCENARIOS
+from engine.scenarios import get_scenario
 from schema.enums import RunStatus
 
 log = logging.getLogger("sc_livesim.engine")
@@ -38,6 +39,10 @@ def _options(raw: dict[str, Any], seed: int) -> SourceOptions:
         sample_rate=float(raw.get("sample_rate", 1.0)),
         dataset_from=ts("dataset_from"),
         dataset_to=ts("dataset_to"),
+        disruptions=tuple(
+            {k: v for k, v in d.items() if k != "requested_start_day"}
+            for d in raw.get("disruptions", [])
+        ),
     )
 
 
@@ -53,15 +58,18 @@ class ReplayEngine:
         self._loaders: dict[str, SourceLoader] = dict(loaders or {})
         self._sources: dict[str, ReplaySource] = {}
 
-    def _loader(self, scenario: str) -> SourceLoader:
+    def _loader(self, conn: psycopg.Connection, scenario: str) -> SourceLoader:
         if scenario not in self._loaders:
-            self._loaders[scenario] = SCENARIOS[scenario].make_loader()
+            found = get_scenario(conn, scenario)
+            if found is None:
+                raise LookupError(f"scenario {scenario!r} not found")
+            self._loaders[scenario] = found.make_loader()
         return self._loaders[scenario]
 
-    def _source(self, run: dict[str, Any]) -> ReplaySource:
+    def _source(self, conn: psycopg.Connection, run: dict[str, Any]) -> ReplaySource:
         source = self._sources.get(run["id"])
         if source is None:
-            loader = self._loader(run["scenario"])
+            loader = self._loader(conn, run["scenario"])
             source = loader(_options(run["options"], run["seed"]))
             self._sources[run["id"]] = source
             log.info(
@@ -95,6 +103,39 @@ class ReplayEngine:
                 (f"{type(exc).__name__}: {exc}", run_id),
             )
 
+    def _apply_disruptions(
+        self, conn: psycopg.Connection, run: dict[str, Any], now: datetime
+    ) -> None:
+        """Add injected disruptions to a simulation and re-plan it.
+
+        Each disruption starts no earlier than just after the run's current
+        simulated time. The simulation is deterministic, so every event before
+        that point (all events already written) stays exactly the same.
+        """
+        current = sim_now(run["sim_position"], run["wall_anchor"], run["time_factor"], now)
+        elapsed_days = (current - run["sim_start"]).total_seconds() / 86400 + 1 / 86400
+        options = dict(run["options"])
+        applied = list(options.get("disruptions", []))
+        for pending in options.pop("pending_disruptions"):
+            requested = pending.get("requested_start_day")
+            start_day = max(requested if requested is not None else 0.0, elapsed_days)
+            applied.append({**pending, "start_day": round(start_day, 6)})
+        options["disruptions"] = applied
+        old = self._sources.pop(run["id"], None)
+        run["options"] = options
+        source = self._source(conn, run)
+        cursor = run["cursor"]
+        if old is not None and [(e.at, e.type, e.object_id) for e in old.events[:cursor]] != [
+            (e.at, e.type, e.object_id) for e in source.events[:cursor]
+        ]:
+            raise RuntimeError("re-planned simulation diverges from events already written")
+        conn.execute(
+            "UPDATE run_control SET options = %s, events_total = %s, updated_at = now()"
+            " WHERE sim_run_id = %s",
+            (Jsonb(options), len(source.events), run["id"]),
+        )
+        log.info("run %s: %d disruption(s) injected, plan rebuilt", run["id"], len(applied))
+
     def _step(self, conn: psycopg.Connection, run_id: str) -> int:
         with conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
@@ -111,8 +152,10 @@ class ReplayEngine:
             status, desired = run["status"], run["desired_status"]
 
             if status == RunStatus.CREATED.value:
-                source = self._source(run)
-                insert_master_data(conn, source.partners, source.items)
+                source = self._source(conn, run)
+                insert_master_data(
+                    conn, source.partners, source.items, source.locations, source.lanes
+                )
                 running = desired == "running"
                 conn.execute(
                     "UPDATE sim_run SET status = %s, wall_start = %s WHERE id = %s",
@@ -125,6 +168,9 @@ class ReplayEngine:
                 )
                 log.info("run %s started with %d planned events", run_id, len(source.events))
                 return 0
+
+            if run["options"].get("pending_disruptions"):
+                self._apply_disruptions(conn, run, now)
 
             if status == RunStatus.PAUSED.value:
                 if desired == "running":
@@ -148,7 +194,7 @@ class ReplayEngine:
                 log.info("run %s paused at %s", run_id, current.isoformat())
                 return 0
 
-            source = self._source(run)
+            source = self._source(conn, run)
             offset = run["sim_start"] - source.origin
             start: int = run["cursor"]
             end = start

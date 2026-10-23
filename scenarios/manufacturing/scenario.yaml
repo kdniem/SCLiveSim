@@ -1,0 +1,65 @@
+# SC LiveSim scenario – licensed under CC BY 4.0
+# An industrial pump manufacturer: one plant in Stuttgart builds pumps from
+# three components (bill of materials) and ships to industrial customers.
+name: manufacturing
+version: 0.1.0
+description: >-
+  Make-to-stock manufacturing: a Stuttgart plant assembles pumps from motors
+  (Hungary), housings (Czech Republic) and control boards (Taiwan, by air) and
+  ships to customers in France, Italy and the Netherlands. Includes a supplier
+  outage and a carrier strike.
+horizon_days: 365
+handling_days: 0.5
+
+locations:
+  - {id: LOC-PLANT-STR, type: plant, name: Stuttgart plant, country: DE, lat: 48.78, lon: 9.18}
+  - {id: LOC-SUP-GYR, type: supplier_site, name: Gyor, country: HU, lat: 47.69, lon: 17.63}
+  - {id: LOC-SUP-PLZ, type: supplier_site, name: Plzen, country: CZ, lat: 49.74, lon: 13.38}
+  - {id: LOC-SUP-HSZ, type: supplier_site, name: Hsinchu, country: TW, lat: 24.80, lon: 120.97}
+  - {id: LOC-CUS-LYS, type: customer_site, name: Lyon, country: FR, lat: 45.76, lon: 4.84}
+  - {id: LOC-CUS-MIL, type: customer_site, name: Milan, country: IT, lat: 45.46, lon: 9.19}
+  - {id: LOC-CUS-RTM, type: customer_site, name: Rotterdam, country: NL, lat: 51.92, lon: 4.48}
+
+partners:
+  - {id: SUP-GYR, role: supplier, location_id: LOC-SUP-GYR, attributes: {supplies: motors}}
+  - {id: SUP-PLZ, role: supplier, location_id: LOC-SUP-PLZ, attributes: {supplies: housings}}
+  - {id: SUP-HSZ, role: supplier, location_id: LOC-SUP-HSZ, attributes: {supplies: control boards}}
+  - {id: CAR-AIR, role: carrier, attributes: {name: Air Cargo}}
+  - {id: CAR-TRUCK, role: carrier, attributes: {name: Truck Line}}
+  - {id: CUS-LYS, role: customer, location_id: LOC-CUS-LYS, attributes: {segment: utilities}}
+  - {id: CUS-MIL, role: customer, location_id: LOC-CUS-MIL, attributes: {segment: chemicals}}
+  - {id: CUS-RTM, role: customer, location_id: LOC-CUS-RTM, attributes: {segment: port operator}}
+
+items:
+  - {id: FG-PUMP, name: Centrifugal pump, category: finished_good, weight_kg: 38, value: 1450}
+  - {id: CMP-MOTOR, name: Electric motor, category: component, weight_kg: 14, value: 310}
+  - {id: CMP-HOUSING, name: Pump housing, category: component, weight_kg: 18, value: 120}
+  - {id: CMP-BOARD, name: Control board, category: component, weight_kg: 0.3, value: 85}
+
+lanes:
+  - {id: LN-GYR-STR, origin_location_id: LOC-SUP-GYR, destination_location_id: LOC-PLANT-STR, mode: road, planned_transit_days: 2, transit_cv: 0.2, cost: 1100, carrier_id: CAR-TRUCK}
+  - {id: LN-PLZ-STR, origin_location_id: LOC-SUP-PLZ, destination_location_id: LOC-PLANT-STR, mode: road, planned_transit_days: 1.5, transit_cv: 0.2, cost: 800, carrier_id: CAR-TRUCK}
+  - {id: LN-HSZ-STR, origin_location_id: LOC-SUP-HSZ, destination_location_id: LOC-PLANT-STR, mode: air, planned_transit_days: 4, transit_cv: 0.15, cost: 5200, carrier_id: CAR-AIR}
+  - {id: LN-STR-LYS, origin_location_id: LOC-PLANT-STR, destination_location_id: LOC-CUS-LYS, mode: road, planned_transit_days: 2, transit_cv: 0.2, cost: 700, carrier_id: CAR-TRUCK}
+  - {id: LN-STR-MIL, origin_location_id: LOC-PLANT-STR, destination_location_id: LOC-CUS-MIL, mode: road, planned_transit_days: 2, transit_cv: 0.2, cost: 750, carrier_id: CAR-TRUCK}
+  - {id: LN-STR-RTM, origin_location_id: LOC-PLANT-STR, destination_location_id: LOC-CUS-RTM, mode: road, planned_transit_days: 2.5, transit_cv: 0.2, cost: 820, carrier_id: CAR-TRUCK}
+
+# Finished goods are made, not bought: no supplier, production fills up to order_up_to.
+stock:
+  - {location_id: LOC-PLANT-STR, item_id: FG-PUMP, initial: 120, safety_stock: 40, reorder_point: 0, order_up_to: 160}
+  - {location_id: LOC-PLANT-STR, item_id: CMP-MOTOR, initial: 220, safety_stock: 60, reorder_point: 160, order_up_to: 320, review_days: 1, supplier_id: SUP-GYR, inbound_lane_id: LN-GYR-STR, supplier_lead_days: 2}
+  - {location_id: LOC-PLANT-STR, item_id: CMP-HOUSING, initial: 220, safety_stock: 60, reorder_point: 140, order_up_to: 300, review_days: 1, supplier_id: SUP-PLZ, inbound_lane_id: LN-PLZ-STR, supplier_lead_days: 1}
+  - {location_id: LOC-PLANT-STR, item_id: CMP-BOARD, initial: 700, safety_stock: 150, reorder_point: 520, order_up_to: 1000, review_days: 2, supplier_id: SUP-HSZ, inbound_lane_id: LN-HSZ-STR, supplier_lead_days: 3}
+
+production:
+  - {location_id: LOC-PLANT-STR, item_id: FG-PUMP, rate_per_day: 40, batch_days: 1, components: {CMP-MOTOR: 1, CMP-HOUSING: 1, CMP-BOARD: 2}}
+
+demand:
+  - {customer_id: CUS-LYS, item_id: FG-PUMP, ship_from: LOC-PLANT-STR, lane_id: LN-STR-LYS, orders_per_day: 1.2, quantity_mean: 8, requested_days: 5}
+  - {customer_id: CUS-MIL, item_id: FG-PUMP, ship_from: LOC-PLANT-STR, lane_id: LN-STR-MIL, orders_per_day: 0.8, quantity_mean: 10, requested_days: 5}
+  - {customer_id: CUS-RTM, item_id: FG-PUMP, ship_from: LOC-PLANT-STR, lane_id: LN-STR-RTM, orders_per_day: 0.6, quantity_mean: 12, quantity_cv: 0.5, requested_days: 7}
+
+disruptions:
+  - {id: DIS-SUP-01, type: supplier_outage, start_day: 25, duration_days: 8, severity: 1.0, locations: [LOC-SUP-HSZ]}
+  - {id: DIS-STRIKE-01, type: carrier_strike, start_day: 60, duration_days: 4, severity: 0.5, lanes: [LN-STR-LYS, LN-STR-MIL]}
+  - {id: DIS-PLANT-01, type: plant_shutdown, start_day: 150, duration_days: 2, severity: 1.0, locations: [LOC-PLANT-STR]}

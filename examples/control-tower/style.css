@@ -127,3 +127,88 @@ footer a { color: var(--accent); }
 @media (prefers-reduced-motion: reduce) {
   tr.flash { animation: none; }
 }
+
+select {
+  font: inherit;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  max-width: 100%;
+}
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}
+.ok { color: var(--ok); }
+.disruptions { margin: 0; padding-left: 18px; }
+.disruptions li { padding: 3px 0; }
+.disruptions strong { color: var(--alert); text-transform: capitalize; }
+
+/* --- navigation and builder ------------------------------------------- */
+a.button-link {
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  text-decoration: none;
+}
+button.primary { background: var(--accent); color: var(--panel); }
+.muted { color: var(--muted); }
+.builder { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1000px) {
+  .builder { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); align-items: start; }
+  .builder .preview { position: sticky; top: 16px; }
+}
+.builder-form fieldset { border: 0; margin: 0 0 18px; padding: 0; min-width: 0; }
+.builder-form legend { font-weight: 600; margin-bottom: 8px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+.card {
+  display: flex; flex-direction: column; gap: 4px; padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: 8px; cursor: pointer; font-size: 13px;
+}
+.card span { color: var(--muted); font-size: 12px; }
+.card input { position: absolute; opacity: 0; pointer-events: none; }
+.card:has(input:checked) { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.card:has(input:focus-visible), .segmented label:has(input:focus-visible) { outline: 2px solid var(--accent); }
+.segmented { display: flex; flex-wrap: wrap; gap: 6px; }
+.segmented label { border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; cursor: pointer; font-size: 13px; }
+.segmented input { position: absolute; opacity: 0; pointer-events: none; }
+.segmented label:has(input:checked) { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.check { display: block; padding: 3px 0; }
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px 16px; }
+.grid-2 legend { grid-column: 1 / -1; }
+.grid-2 label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.panel > .grid-2 { margin-bottom: 4px; }
+input[type="text"], input[type="number"] {
+  font: inherit; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--line);
+  background: var(--panel); color: var(--text);
+}
+.map { width: 100%; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.map svg { display: block; width: 100%; height: auto; }
+.lane { stroke-width: 1.4; opacity: .7; }
+.lane-road { stroke: var(--muted); }
+.lane-rail { stroke: var(--muted); stroke-dasharray: 2 2; }
+.lane-sea { stroke: var(--accent); stroke-dasharray: 6 4; }
+.lane-air { stroke: var(--alert); stroke-dasharray: 2 4; }
+.node { stroke: var(--panel); stroke-width: 1.5; }
+.node-site { fill: var(--text); }
+.node-cus { fill: var(--ok); }
+.node-sup { fill: var(--alert); }
+.node-label { font-size: 12px; fill: var(--text); }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--muted); margin: 6px 0 10px; }
+.legend i { display: inline-block; margin-right: 4px; vertical-align: middle; }
+.dot { width: 9px; height: 9px; border-radius: 50%; }
+.dot-site { background: var(--text); } .dot-cus { background: var(--ok); } .dot-sup { background: var(--alert); }
+.line { width: 18px; height: 0; border-top: 2px dashed var(--muted); }
+.line-sea { border-color: var(--accent); } .line-air { border-color: var(--alert); border-top-style: dotted; }
+.line-road { border-top-style: solid; }
+.figures { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 0 0 12px; font-size: 13px; }
+.figures dt { color: var(--muted); }
+.figures dd { margin: 0; font-variant-numeric: tabular-nums; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.message { min-height: 1.4em; margin: 8px 0 0; }
+.message.error { color: var(--alert); }
+h3 { font-size: 13px; margin: 8px 0 6px; }

@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from schema.enums import EventType, ObjectType
-from schema.models import Item, Partner
+from schema.models import Item, Lane, Location, Partner
 
 # A state change written in the same transaction as its event:
 # (table name, row without sim_run_id). Datetimes are in dataset time.
@@ -44,6 +44,8 @@ class ReplaySource:
     items: Sequence[Item]
     events: Sequence[PlannedEvent]
     notes: dict[str, Any] = field(default_factory=dict)
+    locations: Sequence[Location] = ()
+    lanes: Sequence[Lane] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,6 +56,8 @@ class SourceOptions:
     sample_rate: float = 1.0
     dataset_from: datetime | None = None
     dataset_to: datetime | None = None
+    disruptions: tuple[dict[str, Any], ...] = ()
+    """Disruptions injected into a simulation run (see engine.simulation)."""
 
 
 SourceLoader = Callable[[SourceOptions], ReplaySource]

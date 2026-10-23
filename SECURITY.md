@@ -2,13 +2,17 @@
 
 ## Supported versions
 
-SC LiveSim is pre-release (Phase 1). Only the `main` branch receives fixes.
+SC LiveSim is pre-release (0.x). Only the `main` branch receives fixes.
 
 ## Scope
 
-SC LiveSim is a local test-data engine. Phase 1 has **no authentication** and is
+SC LiveSim is a local test-data engine. It has **no authentication** and is
 not meant to be exposed to the internet. Running it on a public host is at your
 own risk.
+
+Webhooks POST event data to any URL that is registered through the API, and
+their signing secrets are stored in the database in plain text. Only register
+endpoints you control.
 
 ## Reporting a vulnerability
 

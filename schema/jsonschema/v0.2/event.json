@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kdniem/SCLiveSim/schema/v0.2.0/event.json",
+  "x-schema-version": "0.2.0",
+  "$defs": {
+    "EventType": {
+      "enum": [
+        "order.created",
+        "order.confirmed",
+        "shipment.picked_up",
+        "shipment.departed",
+        "shipment.eta_changed",
+        "shipment.delayed",
+        "shipment.delivered",
+        "inventory.below_safety_stock",
+        "inventory.changed",
+        "disruption.started",
+        "disruption.ended"
+      ],
+      "title": "EventType",
+      "type": "string"
+    },
+    "ObjectType": {
+      "enum": [
+        "order",
+        "shipment",
+        "inventory",
+        "disruption"
+      ],
+      "title": "ObjectType",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One immutable entry of the append-only event log.",
+  "properties": {
+    "sim_run_id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "title": "Sim Run Id",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "title": "Id",
+      "type": "string"
+    },
+    "ts": {
+      "format": "date-time",
+      "title": "Ts",
+      "type": "string"
+    },
+    "type": {
+      "$ref": "#/$defs/EventType"
+    },
+    "object_type": {
+      "$ref": "#/$defs/ObjectType"
+    },
+    "object_id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "title": "Object Id",
+      "type": "string"
+    },
+    "payload": {
+      "additionalProperties": true,
+      "title": "Payload",
+      "type": "object"
+    }
+  },
+  "required": [
+    "sim_run_id",
+    "id",
+    "ts",
+    "type",
+    "object_type",
+    "object_id"
+  ],
+  "title": "Event",
+  "type": "object"
+}

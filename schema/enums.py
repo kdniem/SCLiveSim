@@ -62,6 +62,7 @@ class EventType(StrEnum):
     SHIPMENT_DELAYED = "shipment.delayed"
     SHIPMENT_DELIVERED = "shipment.delivered"
     INVENTORY_BELOW_SAFETY_STOCK = "inventory.below_safety_stock"
+    INVENTORY_CHANGED = "inventory.changed"
     DISRUPTION_STARTED = "disruption.started"
     DISRUPTION_ENDED = "disruption.ended"
 
