@@ -9,6 +9,7 @@ Usage: `uv run python -m adapters.dataco.fetch [target_dir]` (default: data/raw)
 
 import hashlib
 import os
+import shutil
 import sys
 import urllib.request
 from dataclasses import dataclass
@@ -22,6 +23,7 @@ ATTRIBUTION = (
     f"(2019), Mendeley Data V{DATASET_VERSION}, https://doi.org/{DATASET_DOI}, {LICENSE}"
 )
 _BASE = "https://data.mendeley.com/public-files/datasets/8gx2fvg2k6/files"
+USER_AGENT = "sc-livesim (+https://github.com/kdniem/SCLiveSim)"
 
 
 @dataclass(frozen=True)
@@ -63,7 +65,10 @@ def download(remote: RemoteFile, target_dir: Path) -> Path:
         return target
     partial = target.with_suffix(".part")
     print(f"Downloading {remote.name} from Mendeley Data ({LICENSE}) ...", flush=True)
-    urllib.request.urlretrieve(remote.url, partial)
+    # Mendeley rejects urllib's default User-Agent with 403.
+    request = urllib.request.Request(remote.url, headers={"User-Agent": USER_AGENT})
+    with urllib.request.urlopen(request, timeout=60) as response, partial.open("wb") as out:
+        shutil.copyfileobj(response, out, length=1 << 20)
     actual = sha256_of(partial)
     if actual != remote.sha256:
         partial.unlink(missing_ok=True)
