@@ -49,12 +49,14 @@ Any 2xx response counts as delivered. Otherwise the worker retries after 2, 4,
 ```python
 import hashlib, hmac, time
 
+
 def verify(secret: str, timestamp: str, body: bytes, signature: str) -> bool:
     if abs(time.time() - int(timestamp)) > 300:  # reject replays older than 5 minutes
         return False
-    expected = "sha256=" + hmac.new(
-        secret.encode(), f"{timestamp}.".encode() + body, hashlib.sha256
-    ).hexdigest()
+    expected = (
+        "sha256="
+        + hmac.new(secret.encode(), f"{timestamp}.".encode() + body, hashlib.sha256).hexdigest()
+    )
     return hmac.compare_digest(expected, signature)
 ```
 

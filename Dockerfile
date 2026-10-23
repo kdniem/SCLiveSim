@@ -22,6 +22,7 @@ COPY adapters ./adapters
 COPY api ./api
 COPY examples ./examples
 COPY scenarios ./scenarios
+COPY mcp_server ./mcp_server
 RUN uv sync --frozen --no-dev
 
 
