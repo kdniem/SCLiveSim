@@ -12,7 +12,10 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering",
 ]
-dependencies = []
+dependencies = [
+    "psycopg[binary]>=3.2",
+    "pydantic>=2.9",
+]
 
 [project.urls]
 Repository = "https://github.com/kdniem/SCLiveSim"

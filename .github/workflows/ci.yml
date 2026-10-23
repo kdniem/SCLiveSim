@@ -8,6 +8,19 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: livesim
+          POSTGRES_PASSWORD: livesim
+          POSTGRES_DB: livesim
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U livesim"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    env:
+      DATABASE_URL: postgresql://livesim:livesim@localhost:5432/livesim
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
