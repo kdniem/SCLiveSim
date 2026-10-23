@@ -293,6 +293,19 @@
           ],
           "default": null,
           "title": "Carrier Id"
+        },
+        "service": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Service class shown as shipping_mode, e.g. 'First Class'",
+          "title": "Service"
         }
       },
       "required": [
@@ -511,6 +524,7 @@
           "type": "string"
         },
         "initial": {
+          "default": 0,
           "minimum": 0,
           "title": "Initial",
           "type": "number"
@@ -522,12 +536,14 @@
           "type": "number"
         },
         "reorder_point": {
+          "default": 0,
           "description": "Reorder when on hand + on order <= this",
           "minimum": 0,
           "title": "Reorder Point",
           "type": "number"
         },
         "order_up_to": {
+          "default": 1,
           "exclusiveMinimum": 0,
           "title": "Order Up To",
           "type": "number"
@@ -576,14 +592,17 @@
           "minimum": 0,
           "title": "Supplier Lead Days",
           "type": "number"
+        },
+        "unlimited": {
+          "default": false,
+          "description": "Stock is not modelled: always available, no inventory rows or events (for data sources without inventory)",
+          "title": "Unlimited",
+          "type": "boolean"
         }
       },
       "required": [
         "location_id",
-        "item_id",
-        "initial",
-        "reorder_point",
-        "order_up_to"
+        "item_id"
       ],
       "title": "StockPolicy",
       "type": "object"

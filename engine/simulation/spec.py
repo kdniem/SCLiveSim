@@ -41,6 +41,9 @@ class LaneSpec(SpecModel):
     transit_mean_ratio: float = Field(0.9, gt=0, le=3, description="Mean actual / planned")
     cost: float | None = Field(None, ge=0)
     carrier_id: StableId | None = None
+    service: str | None = Field(
+        None, description="Service class shown as shipping_mode, e.g. 'First Class'"
+    )
 
 
 class StockPolicy(SpecModel):
@@ -48,17 +51,24 @@ class StockPolicy(SpecModel):
 
     location_id: StableId
     item_id: StableId
-    initial: float = Field(ge=0)
+    initial: float = Field(0, ge=0)
     safety_stock: float = Field(0, ge=0)
-    reorder_point: float = Field(ge=0, description="Reorder when on hand + on order <= this")
-    order_up_to: float = Field(gt=0)
+    reorder_point: float = Field(0, ge=0, description="Reorder when on hand + on order <= this")
+    order_up_to: float = Field(1, gt=0)
     review_days: PositiveDays = Field(1.0, description="Policy is checked every n days")
     supplier_id: StableId | None = Field(None, description="Replenish from this supplier")
     inbound_lane_id: StableId | None = None
     supplier_lead_days: PositiveDays = Field(1.0, description="Supplier processing time")
+    unlimited: bool = Field(
+        False,
+        description="Stock is not modelled: always available, no inventory rows or events "
+        "(for data sources without inventory)",
+    )
 
     @model_validator(mode="after")
     def _check(self) -> Self:
+        if self.unlimited and self.supplier_id:
+            raise ValueError("unlimited stock cannot have a supplier")
         if self.order_up_to < self.reorder_point:
             raise ValueError("order_up_to must be >= reorder_point")
         if (self.supplier_id is None) != (self.inbound_lane_id is None):

@@ -81,6 +81,25 @@
     </section>
 
     <section class="panel">
+      <h2>Continue an existing dataset</h2>
+      <p class="muted">Replay the end of a real dataset, then let a simulation calibrated on it
+        continue seamlessly: same products, destinations, shipping classes, order volumes and
+        lateness. The first use loads the dataset (DataCo, 96 MB, CC BY 4.0; about 15 seconds).</p>
+      <div class="grid-2">
+        <label>Dataset
+          <select id="dataset"><option value="dataco">DataCo Smart Supply Chain (2015–2018)</option></select>
+        </label>
+        <label>Calibration window for “save for editing” (days)<input id="window-days" type="number" min="7" max="1100" value="90"></label>
+      </div>
+      <div class="actions">
+        <button id="continue" type="button" class="primary">Replay &amp; continue</button>
+        <button id="calibrate" type="button">Calibrate &amp; save for editing</button>
+        <a id="calibrated-download" class="button-link" hidden>Download YAML</a>
+      </div>
+      <p id="continue-message" class="message" role="status"></p>
+    </section>
+
+    <section class="panel">
       <h2>Upload your own scenario</h2>
       <p class="muted">A YAML file in the <a href="https://github.com/kdniem/SCLiveSim/tree/main/scenarios">scenario format</a>, for example an edited download.</p>
       <input id="upload" type="file" accept=".yaml,.yml,application/yaml,text/yaml">

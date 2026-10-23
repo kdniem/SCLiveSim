@@ -181,6 +181,7 @@ button.primary { background: var(--accent); color: var(--panel); }
 .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px 16px; }
 .grid-2 legend { grid-column: 1 / -1; }
 .grid-2 label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.panel > .grid-2 { margin-bottom: 4px; }
 input[type="text"], input[type="number"] {
   font: inherit; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--line);
   background: var(--panel); color: var(--text);

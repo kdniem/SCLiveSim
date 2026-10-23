@@ -188,9 +188,7 @@ async function onSave(startRun) {
       body: JSON.stringify({ scenario: created.name, time_factor: 1440 }),
     });
     setMessage("message", `Started ${run.id}. Opening the control tower …`);
-    const target = new URLSearchParams({ run: run.id });
-    if (params.get("api")) target.set("api", params.get("api"));
-    setTimeout(() => { location.href = `index.html?${target}`; }, 800);
+    openRun(run);
   } catch (err) {
     setMessage("message", err.message.includes("already exists")
       ? `${err.message}. Change the name or the seed.` : err.message, true);
@@ -207,6 +205,44 @@ async function onUpload(event) {
     setMessage("upload-message", `Uploaded “${created.name}”. Start it with POST /runs or from the control tower API.`);
   } catch (err) {
     setMessage("upload-message", err.message, true);
+  }
+}
+
+function openRun(run) {
+  const target = new URLSearchParams({ run: run.id });
+  if (params.get("api")) target.set("api", params.get("api"));
+  setTimeout(() => { location.href = `index.html?${target}`; }, 800);
+}
+
+async function onContinue() {
+  setMessage("continue-message", "Starting … (the engine loads the dataset on first use)");
+  try {
+    const run = await api("/runs", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ scenario: `${$("dataset").value}-continued`, time_factor: 1440 }),
+    });
+    setMessage("continue-message", `Started ${run.id}. Opening the control tower …`);
+    openRun(run);
+  } catch (err) {
+    setMessage("continue-message", err.message, true);
+  }
+}
+
+async function onCalibrate() {
+  const windowDays = Number($("window-days").value);
+  const name = `${$("dataset").value}-calibrated-${windowDays}d`;
+  setMessage("continue-message", "Calibrating … (about 15 seconds the first time)");
+  try {
+    const created = await api("/scenarios/calibrate", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ source: $("dataset").value, name, window_days: windowDays }),
+    });
+    const link = $("calibrated-download");
+    link.href = `${API}/scenarios/${encodeURIComponent(created.name)}?format=yaml`;
+    link.hidden = false;
+    setMessage("continue-message", `Saved “${created.name}”. ${created.description}`);
+  } catch (err) {
+    setMessage("continue-message", err.message, true);
   }
 }
 
@@ -235,6 +271,8 @@ async function start() {
   $("save").addEventListener("click", () => onSave(false));
   $("start").addEventListener("click", () => onSave(true));
   $("upload").addEventListener("change", onUpload);
+  $("continue").addEventListener("click", onContinue);
+  $("calibrate").addEventListener("click", onCalibrate);
   schedulePreview();
 }
 

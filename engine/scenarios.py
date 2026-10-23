@@ -53,6 +53,15 @@ def _dataco_loader() -> SourceLoader:
     return DataCoLoader(ensure_dataset(auto_download=auto))
 
 
+def _dataco_continuation() -> SourceLoader:
+    from adapters.dataco import DataCoLoader
+    from engine.continuation import DataCoContinuation
+
+    loader = _dataco_loader()
+    assert isinstance(loader, DataCoLoader)
+    return DataCoContinuation(loader)
+
+
 def _simulation_scenarios(root: Path) -> dict[str, Scenario]:
     from engine.simulation.model import SimulationLoader
     from engine.simulation.spec import ScenarioSpec, load_scenario
@@ -89,6 +98,16 @@ def _registry() -> dict[str, Scenario]:
             make_loader=_dataco_loader,
         )
     }
+    registry["dataco-continued"] = Scenario(
+        name="dataco-continued",
+        version=f"mendeley-v{DATASET_VERSION}-cal1",
+        mode=RunMode.CALIBRATION,
+        description=(
+            "DataCo replay of the last 30 days, then a simulation calibrated on the dataset "
+            "continues it seamlessly"
+        ),
+        make_loader=_dataco_continuation,
+    )
     registry.update(_simulation_scenarios(scenarios_dir()))
     return registry
 

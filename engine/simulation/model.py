@@ -101,15 +101,20 @@ class Simulation:
         spec: ScenarioSpec,
         seed: int,
         injected: tuple[DisruptionSpec, ...] = (),
+        id_namespace: str = "",
     ) -> None:
         self.spec = spec
+        self.id_namespace = id_namespace
         self.seed = seed
         self.env = simpy.Environment()
         self.events: list[PlannedEvent] = []
         self.items = {i.id: i for i in spec.items}
         self.lanes = {lane.id: lane for lane in spec.lanes}
         self.locations = {loc.id: loc for loc in spec.locations}
-        self.stock = {(s.location_id, s.item_id): Stock(s, s.initial) for s in spec.stock}
+        self.stock = {
+            (s.location_id, s.item_id): Stock(s, math.inf if s.unlimited else s.initial)
+            for s in spec.stock
+        }
         self.disruptions = sorted((*spec.disruptions, *injected), key=lambda d: (d.start_day, d.id))
         self.lane_delays: dict[str, list[Window]] = {}
         self.outages: dict[str, list[Window]] = {}
@@ -134,7 +139,7 @@ class Simulation:
     def next_id(self, prefix: str, width: int = 6) -> str:
         n = self._counters.get(prefix, 0) + 1
         self._counters[prefix] = n
-        return f"{prefix}-{n:0{width}d}"
+        return f"{prefix}-{self.id_namespace}{n:0{width}d}"
 
     def ts(self, day: float) -> datetime:
         # Round to whole seconds so timestamps are stable and readable.
@@ -159,6 +164,10 @@ class Simulation:
                 changes=changes,
             )
         )
+
+    def inv(self, key: tuple[str, str]) -> tuple[StateChange, ...]:
+        """The inventory row as a state change, or nothing for unlimited stock."""
+        return () if self.stock[key].policy.unlimited else (self.inventory_row(key),)
 
     def inventory_row(self, key: tuple[str, str]) -> StateChange:
         s = self.stock[key]
@@ -213,7 +222,8 @@ class Simulation:
 
     def run(self) -> list[PlannedEvent]:
         for key in sorted(self.stock):
-            self.env.process(self._initial(key))
+            if not self.stock[key].policy.unlimited:
+                self.env.process(self._initial(key))
         for d in self.disruptions:
             self.env.process(self._disruption(d))
         for n, stream in enumerate(self.spec.demand):
@@ -311,7 +321,7 @@ class Simulation:
             "requested_date": self.ts(requested) if requested is not None else None,
             "status": OrderStatus.CREATED.value,
             "attributes": {
-                "shipping_mode": lane.mode,
+                "shipping_mode": lane.service or lane.mode,
                 "lane_id": lane.id,
                 "origin": self.place(lane.origin_location_id),
                 "destination": self.place(lane.destination_location_id),
@@ -348,7 +358,7 @@ class Simulation:
             "partner_id": order.partner_id,
             "item_id": order.item_id,
             "quantity": order.quantity,
-            "shipping_mode": order.lane.mode,
+            "shipping_mode": order.lane.service or order.lane.mode,
             "lane_id": order.lane.id,
             "origin": self.place(order.lane.origin_location_id),
             "destination": self.place(order.lane.destination_location_id),
@@ -373,7 +383,7 @@ class Simulation:
                     "status": OrderStatus.CONFIRMED.value,
                     "waited_days": round(self.env.now - order.created, 4),
                 },
-                (self._set_order_status(order, OrderStatus.CONFIRMED), self.inventory_row(key)),
+                (self._set_order_status(order, OrderStatus.CONFIRMED), *self.inv(key)),
             )
             self.env.process(self._fulfil(order, key))
 
@@ -385,7 +395,7 @@ class Simulation:
         s = self.stock[key]
         s.on_hand -= order.quantity
         s.reserved -= order.quantity
-        changes = (self._set_order_status(order, OrderStatus.SHIPPED), self.inventory_row(key))
+        changes = (self._set_order_status(order, OrderStatus.SHIPPED), *self.inv(key))
         yield from self._transport(order, etd, rng, departure_changes=changes)
         self.check_safety(key)
 
@@ -631,6 +641,11 @@ def _qty(value: float) -> float:
     return round(value, 4)
 
 
+def core_lanes(spec: ScenarioSpec) -> list[Lane]:
+    """The scenario's lanes as core schema lanes (without simulation parameters)."""
+    return [Lane.model_validate(ln.model_dump(include=set(Lane.model_fields))) for ln in spec.lanes]
+
+
 def simulate(spec: ScenarioSpec, options: SourceOptions) -> ReplaySource:
     injected = tuple(disruption_from_dict(d) for d in options.disruptions)
     sim = Simulation(spec, options.seed, injected)
@@ -643,9 +658,7 @@ def simulate(spec: ScenarioSpec, options: SourceOptions) -> ReplaySource:
         items=spec.items,
         events=events,
         locations=spec.locations,
-        lanes=[
-            Lane.model_validate(ln.model_dump(include=set(Lane.model_fields))) for ln in spec.lanes
-        ],
+        lanes=core_lanes(spec),
         notes={"license": "CC0-1.0 (generated data)", "horizon_days": spec.horizon_days},
     )
 
