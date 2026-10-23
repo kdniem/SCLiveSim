@@ -49,7 +49,7 @@ def admin_url() -> Iterator[str]:
     def pg(tool: str, *args: str, check: bool = True) -> None:
         subprocess.run([*prefix, str(pg_bin / tool), *args], check=check, capture_output=True)
 
-    pg("initdb", "-D", str(data), "-U", "postgres", "-A", "trust")
+    pg("initdb", "-D", str(data), "-U", "postgres", "-A", "trust", "-E", "UTF8")
     pg("pg_ctl", "-D", str(data), "-w", "-l", str(tmp / "log"),
        "-o", f"-p {port} -k {tmp} -c listen_addresses=''", "start")  # fmt: skip
     try:
