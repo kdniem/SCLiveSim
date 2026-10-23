@@ -48,7 +48,7 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["schema", "engine", "adapters"]
+files = ["schema", "engine", "adapters", "api"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
