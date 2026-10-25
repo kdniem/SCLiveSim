@@ -44,10 +44,28 @@ class RunOut(BaseModel):
     error: str | None = None
 
 
-class ScenarioOut(BaseModel):
+class DisruptionTypeOut(BaseModel):
     name: str
-    version: str
+    effect: str
+    targets: str = Field(description="Whether the disruption affects lanes or locations")
     description: str
+
+
+class DisruptionCreate(BaseModel):
+    type: str = Field(description="A type from GET /disruption-types")
+    severity: float = Field(ge=0, le=1)
+    duration_days: float = Field(gt=0, le=365)
+    lanes: list[str] = Field(default_factory=list)
+    locations: list[str] = Field(default_factory=list)
+    start: datetime | None = Field(
+        None, description="Simulated start time (default: now; never earlier than now)"
+    )
+
+
+class DisruptionAccepted(BaseModel):
+    id: str
+    run_id: str
+    status: str = "pending"
 
 
 class ShipmentOut(Shipment):

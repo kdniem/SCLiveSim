@@ -11,7 +11,7 @@ from psycopg import sql
 from psycopg.types.json import Jsonb
 
 from engine.replay.plan import PlannedEvent, shift
-from schema.models import Item, Partner
+from schema.models import Item, Lane, Location, Partner
 
 # Primary keys of the per-run state tables (sim_run_id is added automatically).
 STATE_KEYS: dict[str, tuple[str, ...]] = {
@@ -19,6 +19,7 @@ STATE_KEYS: dict[str, tuple[str, ...]] = {
     "order_line": ("id",),
     "shipment": ("id",),
     "inventory": ("location_id", "item_id"),
+    "disruption": ("id",),
 }
 JSON_COLUMNS = {"attributes", "payload", "affected"}
 
@@ -42,10 +43,23 @@ def event_id(index: int) -> str:
 
 
 def insert_master_data(
-    conn: psycopg.Connection, partners: Sequence[Partner], items: Sequence[Item]
+    conn: psycopg.Connection,
+    partners: Sequence[Partner],
+    items: Sequence[Item],
+    locations: Sequence[Location] = (),
+    lanes: Sequence[Lane] = (),
 ) -> None:
     """Insert master data shared by all runs (existing rows are left unchanged)."""
     with conn.cursor() as cur:
+        cur.executemany(
+            "INSERT INTO location (id, type, name, country, lat, lon, attributes)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING",
+            [
+                (loc.id, loc.type.value, loc.name, loc.country, loc.lat, loc.lon,
+                 to_json(loc.attributes))
+                for loc in locations
+            ],
+        )  # fmt: skip
         cur.executemany(
             "INSERT INTO partner (id, role, location_id, attributes) VALUES (%s, %s, %s, %s)"
             " ON CONFLICT (id) DO NOTHING",
@@ -59,6 +73,16 @@ def insert_master_data(
                 for i in items
             ],
         )
+        cur.executemany(
+            "INSERT INTO lane (id, origin_location_id, destination_location_id, mode,"
+            " planned_transit_days, cost) VALUES (%s, %s, %s, %s, %s, %s)"
+            " ON CONFLICT (id) DO NOTHING",
+            [
+                (ln.id, ln.origin_location_id, ln.destination_location_id, ln.mode.value,
+                 ln.planned_transit_days, ln.cost)
+                for ln in lanes
+            ],
+        )  # fmt: skip
 
 
 def _upsert(cur: psycopg.Cursor, table: str, run_id: str, row: dict[str, Any]) -> None:

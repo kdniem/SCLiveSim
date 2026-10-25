@@ -397,7 +397,10 @@ class DataCoLoader:
         self.path = path
         self._parsed: _Parsed | None = None
 
-    def __call__(self, options: SourceOptions) -> ReplaySource:
+    def parsed(self) -> _Parsed:
         if self._parsed is None:
             self._parsed = parse(read_rows(self.path))
-        return build_source(self._parsed, options)
+        return self._parsed
+
+    def __call__(self, options: SourceOptions) -> ReplaySource:
+        return build_source(self.parsed(), options)

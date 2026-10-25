@@ -14,13 +14,15 @@
     </div>
     <div class="run">
       <span id="conn" class="pill pill-off" title="Stream connection">offline</span>
-      <span id="run-id" class="mono">–</span>
+      <label class="visually-hidden" for="run-select">Run</label>
+      <select id="run-select" aria-label="Run"></select>
       <span id="run-status" class="pill">–</span>
       <span class="clock" title="Simulated time (UTC)">
         <span class="label">sim time</span>
         <span id="sim-time" class="mono">–</span>
       </span>
       <button id="toggle" type="button" disabled>Pause</button>
+      <a class="button-link" href="builder.html">Build a scenario</a>
     </div>
   </header>
 
@@ -29,15 +31,31 @@
       <div class="kpi"><span class="kpi-label">Open shipments</span><span id="kpi-open" class="kpi-value">–</span></div>
       <div class="kpi kpi-alert"><span class="kpi-label">Delayed</span><span id="kpi-delayed" class="kpi-value">–</span></div>
       <div class="kpi"><span class="kpi-label">Delayed share</span><span id="kpi-share" class="kpi-value">–</span></div>
+      <div class="kpi kpi-alert"><span class="kpi-label">Active disruptions</span><span id="kpi-disruptions" class="kpi-value">–</span></div>
       <div class="kpi"><span class="kpi-label">Delivered (this session)</span><span id="kpi-delivered" class="kpi-value">0</span></div>
+    </section>
+
+    <section id="disruption-panel" class="panel" hidden>
+      <h2>Active disruptions</h2>
+      <ul id="disruptions" class="disruptions"></ul>
     </section>
 
     <section class="panel">
       <h2>Delayed shipments <span id="delayed-count" class="count"></span></h2>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Shipment</th><th>Destination</th><th>Mode</th><th>Planned ETA</th><th>Current ETA</th><th>Delay</th></tr></thead>
-          <tbody id="delayed-body"><tr class="empty"><td colspan="6">No delayed shipments.</td></tr></tbody>
+          <thead><tr><th>Shipment</th><th>Dir.</th><th>Route</th><th>Mode</th><th>Planned ETA</th><th>Current ETA</th><th>Delay</th><th>Cause</th></tr></thead>
+          <tbody id="delayed-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="inventory-panel" class="panel" hidden>
+      <h2>Inventory</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Location</th><th>Item</th><th class="num">On hand</th><th class="num">Reserved</th><th class="num">Inbound</th><th>Stock</th></tr></thead>
+          <tbody id="inventory-body"></tbody>
         </table>
       </div>
     </section>
@@ -46,11 +64,11 @@
       <h2>Open shipments <span id="open-count" class="count"></span></h2>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Shipment</th><th>Destination</th><th>Mode</th><th>Departed</th><th>Planned ETA</th><th>Status</th></tr></thead>
-          <tbody id="open-body"><tr class="empty"><td colspan="6">No open shipments.</td></tr></tbody>
+          <thead><tr><th>Shipment</th><th>Dir.</th><th>Route</th><th>Mode</th><th>Departed</th><th>Planned ETA</th><th>Status</th></tr></thead>
+          <tbody id="open-body"></tbody>
         </table>
       </div>
-      <p class="hint">Showing the 100 most recent. All data is replayed from the public DataCo dataset (CC BY 4.0).</p>
+      <p class="hint" id="source-note">Showing the 100 most recent.</p>
     </section>
 
     <section class="panel">

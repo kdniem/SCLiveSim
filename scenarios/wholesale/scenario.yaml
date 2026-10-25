@@ -1,0 +1,72 @@
+# SC LiveSim scenario – licensed under CC BY 4.0
+# A consumer electronics and home goods wholesaler: one distribution centre in
+# Hamburg, sourcing from China by sea and from Poland by road, delivering to
+# retail customers in Central Europe.
+name: wholesale
+version: 0.1.0
+description: >-
+  Wholesale distribution: a Hamburg DC replenishes from suppliers in China (sea)
+  and Poland (road) and serves retailers in five cities. Includes a port closure
+  and a demand spike.
+horizon_days: 365
+handling_days: 0.25
+
+locations:
+  - {id: LOC-DC-HAM, type: warehouse, name: Hamburg DC, country: DE, lat: 53.55, lon: 9.99}
+  - {id: LOC-SUP-SZX, type: supplier_site, name: Shenzhen, country: CN, lat: 22.54, lon: 114.06}
+  - {id: LOC-SUP-POZ, type: supplier_site, name: Poznan, country: PL, lat: 52.41, lon: 16.93}
+  - {id: LOC-CUS-BER, type: customer_site, name: Berlin, country: DE, lat: 52.52, lon: 13.40}
+  - {id: LOC-CUS-MUC, type: customer_site, name: Munich, country: DE, lat: 48.14, lon: 11.58}
+  - {id: LOC-CUS-CGN, type: customer_site, name: Cologne, country: DE, lat: 50.94, lon: 6.96}
+  - {id: LOC-CUS-VIE, type: customer_site, name: Vienna, country: AT, lat: 48.21, lon: 16.37}
+  - {id: LOC-CUS-CPH, type: customer_site, name: Copenhagen, country: DK, lat: 55.68, lon: 12.57}
+
+partners:
+  - {id: SUP-SZX, role: supplier, location_id: LOC-SUP-SZX}
+  - {id: SUP-POZ, role: supplier, location_id: LOC-SUP-POZ}
+  - {id: CAR-OCEAN, role: carrier, attributes: {name: Ocean Line}}
+  - {id: CAR-ROAD, role: carrier, attributes: {name: Road Freight}}
+  - {id: CUS-BER, role: customer, location_id: LOC-CUS-BER, attributes: {segment: retail}}
+  - {id: CUS-MUC, role: customer, location_id: LOC-CUS-MUC, attributes: {segment: retail}}
+  - {id: CUS-CGN, role: customer, location_id: LOC-CUS-CGN, attributes: {segment: retail}}
+  - {id: CUS-VIE, role: customer, location_id: LOC-CUS-VIE, attributes: {segment: retail}}
+  - {id: CUS-CPH, role: customer, location_id: LOC-CUS-CPH, attributes: {segment: online}}
+
+items:
+  - {id: ITM-HEADSET, name: Wireless headset, category: electronics, weight_kg: 0.4, value: 59}
+  - {id: ITM-KETTLE, name: Electric kettle, category: home, weight_kg: 1.2, value: 35}
+  - {id: ITM-CHAIR, name: Office chair, category: furniture, weight_kg: 14, value: 149}
+  - {id: ITM-LAMP, name: Desk lamp, category: home, weight_kg: 1.5, value: 29}
+
+lanes:
+  - {id: LN-SZX-HAM, origin_location_id: LOC-SUP-SZX, destination_location_id: LOC-DC-HAM, mode: sea, planned_transit_days: 35, transit_cv: 0.1, cost: 2400, carrier_id: CAR-OCEAN}
+  - {id: LN-POZ-HAM, origin_location_id: LOC-SUP-POZ, destination_location_id: LOC-DC-HAM, mode: road, planned_transit_days: 2, transit_cv: 0.2, cost: 900, carrier_id: CAR-ROAD}
+  - {id: LN-HAM-BER, origin_location_id: LOC-DC-HAM, destination_location_id: LOC-CUS-BER, mode: road, planned_transit_days: 1, transit_cv: 0.25, cost: 300, carrier_id: CAR-ROAD}
+  - {id: LN-HAM-MUC, origin_location_id: LOC-DC-HAM, destination_location_id: LOC-CUS-MUC, mode: road, planned_transit_days: 2, transit_cv: 0.25, cost: 450, carrier_id: CAR-ROAD}
+  - {id: LN-HAM-CGN, origin_location_id: LOC-DC-HAM, destination_location_id: LOC-CUS-CGN, mode: road, planned_transit_days: 1, transit_cv: 0.25, cost: 350, carrier_id: CAR-ROAD}
+  - {id: LN-HAM-VIE, origin_location_id: LOC-DC-HAM, destination_location_id: LOC-CUS-VIE, mode: road, planned_transit_days: 3, transit_cv: 0.25, cost: 600, carrier_id: CAR-ROAD}
+  - {id: LN-HAM-CPH, origin_location_id: LOC-DC-HAM, destination_location_id: LOC-CUS-CPH, mode: road, planned_transit_days: 1.5, transit_cv: 0.25, cost: 400, carrier_id: CAR-ROAD}
+
+# (s, S) policies at the DC. Reorder points cover demand over supplier lead
+# time + transit; the sea items are reviewed weekly.
+stock:
+  - {location_id: LOC-DC-HAM, item_id: ITM-HEADSET, initial: 2600, safety_stock: 400, reorder_point: 2200, order_up_to: 3600, review_days: 7, supplier_id: SUP-SZX, inbound_lane_id: LN-SZX-HAM, supplier_lead_days: 3}
+  - {location_id: LOC-DC-HAM, item_id: ITM-KETTLE, initial: 1800, safety_stock: 250, reorder_point: 1500, order_up_to: 2500, review_days: 7, supplier_id: SUP-SZX, inbound_lane_id: LN-SZX-HAM, supplier_lead_days: 3}
+  - {location_id: LOC-DC-HAM, item_id: ITM-CHAIR, initial: 250, safety_stock: 40, reorder_point: 120, order_up_to: 300, review_days: 1, supplier_id: SUP-POZ, inbound_lane_id: LN-POZ-HAM, supplier_lead_days: 2}
+  - {location_id: LOC-DC-HAM, item_id: ITM-LAMP, initial: 300, safety_stock: 50, reorder_point: 150, order_up_to: 350, review_days: 1, supplier_id: SUP-POZ, inbound_lane_id: LN-POZ-HAM, supplier_lead_days: 2}
+
+demand:
+  - {customer_id: CUS-BER, item_id: ITM-HEADSET, ship_from: LOC-DC-HAM, lane_id: LN-HAM-BER, orders_per_day: 1.5, quantity_mean: 12, requested_days: 2}
+  - {customer_id: CUS-MUC, item_id: ITM-HEADSET, ship_from: LOC-DC-HAM, lane_id: LN-HAM-MUC, orders_per_day: 1.2, quantity_mean: 10, requested_days: 3}
+  - {customer_id: CUS-CPH, item_id: ITM-HEADSET, ship_from: LOC-DC-HAM, lane_id: LN-HAM-CPH, orders_per_day: 2.0, quantity_mean: 4, quantity_cv: 0.6, requested_days: 2}
+  - {customer_id: CUS-CGN, item_id: ITM-KETTLE, ship_from: LOC-DC-HAM, lane_id: LN-HAM-CGN, orders_per_day: 1.0, quantity_mean: 15, requested_days: 2}
+  - {customer_id: CUS-VIE, item_id: ITM-KETTLE, ship_from: LOC-DC-HAM, lane_id: LN-HAM-VIE, orders_per_day: 0.8, quantity_mean: 18, requested_days: 4}
+  - {customer_id: CUS-BER, item_id: ITM-CHAIR, ship_from: LOC-DC-HAM, lane_id: LN-HAM-BER, orders_per_day: 0.8, quantity_mean: 8, requested_days: 3}
+  - {customer_id: CUS-MUC, item_id: ITM-CHAIR, ship_from: LOC-DC-HAM, lane_id: LN-HAM-MUC, orders_per_day: 0.6, quantity_mean: 10, requested_days: 4}
+  - {customer_id: CUS-CGN, item_id: ITM-LAMP, ship_from: LOC-DC-HAM, lane_id: LN-HAM-CGN, orders_per_day: 1.0, quantity_mean: 12, requested_days: 2}
+  - {customer_id: CUS-CPH, item_id: ITM-LAMP, ship_from: LOC-DC-HAM, lane_id: LN-HAM-CPH, orders_per_day: 1.5, quantity_mean: 3, quantity_cv: 0.6, requested_days: 2}
+
+disruptions:
+  - {id: DIS-PORT-01, type: port_closure, start_day: 40, duration_days: 6, severity: 0.8, lanes: [LN-SZX-HAM]}
+  - {id: DIS-SPIKE-01, type: demand_spike, start_day: 75, duration_days: 5, severity: 0.4, locations: [LOC-DC-HAM]}
+  - {id: DIS-STRIKE-01, type: carrier_strike, start_day: 120, duration_days: 3, severity: 0.6, lanes: [LN-HAM-MUC, LN-HAM-VIE]}

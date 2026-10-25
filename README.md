@@ -7,10 +7,17 @@ shipments, inventory, disruptions) through one open schema and one event
 stream. Control towers, risk tools, ETA trackers and dashboards plug into it
 instead of loading static CSVs.
 
-> **Status: v0.1 (Phase 1, Replay MVP).** Replays the public DataCo Smart Supply
-> Chain dataset as a live stream. Simulation, scenarios and calibration follow.
+Three ways to get data, one stream for all of them:
 
-![Mini Control Tower showing live shipments](docs/images/control-tower.png)
+| | |
+| --- | --- |
+| **Click together your own supply chain** | Pick industry, region, size, flows (inbound, production, outbound) and a disruption profile in the scenario builder; SC LiveSim generates the network and simulates it. |
+| **Replay real data** | The public DataCo Smart Supply Chain dataset, played back as if it were happening now. |
+| **Continue real data** | Replay the end of a dataset, then a simulation calibrated on it carries on seamlessly. |
+
+> **Status: v0.2.0 (Phase 2, Simulation).** See the [CHANGELOG](CHANGELOG.md).
+
+![Mini Control Tower showing live shipments, inventory and disruptions](docs/images/control-tower.png)
 
 ## Quickstart (about 5 minutes)
 
@@ -22,85 +29,108 @@ cd SCLiveSim
 docker compose up -d
 ```
 
-On first start the engine downloads the DataCo dataset (96 MB, CC BY 4.0) into
-`data/raw/`, loads it (about 15 seconds) and starts a replay at **1440×**: one
-simulated day per minute, beginning *now*.
+The engine starts the `wholesale` simulation at **1440×** (one simulated day per
+minute, beginning *now*).
 
 | What | Where |
 | --- | --- |
 | Mini control tower | <http://localhost:8080> |
+| Scenario builder | <http://localhost:8080/builder.html> |
 | API docs (OpenAPI) | <http://localhost:8000/docs> |
 | Live event stream | `curl -N http://localhost:8000/stream` |
 
 Watch the engine with `docker compose logs -f engine`. Stop everything with
 `docker compose down` (add `-v` to delete the database).
 
-The first delayed shipments appear after one to four minutes, when their
-planned delivery date passes.
+![Scenario builder](docs/images/scenario-builder.png)
 
-## Use the API
+## Build your own scenario
+
+In the [scenario builder](http://localhost:8080/builder.html), or via the API:
 
 ```bash
-# Runs: list, start another one, pause, resume
-curl http://localhost:8000/runs
+curl -X POST http://localhost:8000/scenarios -H 'content-type: application/json' \
+     -d '{"name": "my-pharma", "industry": "pharma", "region": "north_america",
+          "size": "medium", "disruptions": "high"}'
 curl -X POST http://localhost:8000/runs -H 'content-type: application/json' \
-     -d '{"seed": 7, "time_factor": 3600, "sample_rate": 0.5}'
-curl -X POST http://localhost:8000/runs/RUN-0001/pause
-curl -X POST http://localhost:8000/runs/RUN-0001/resume
-
-# Current state (default: the most recent run, or ?run=RUN-0001)
-curl 'http://localhost:8000/shipments?open=true'
-curl 'http://localhost:8000/shipments?delayed=true&expand=order'
-curl 'http://localhost:8000/orders?status=cancelled'
-
-# Only delay events, as Server-Sent Events
-curl -N 'http://localhost:8000/stream?types=shipment.delayed'
+     -d '{"scenario": "my-pharma", "time_factor": 1440}'
 ```
+
+| Choice | Options |
+| --- | --- |
+| Industry | consumer electronics, fashion retail, food & beverage, pharma, automotive parts (production), industrial machinery (production) |
+| Region | Europe, North America, Asia-Pacific, Latin America (real cities; overseas sourcing hubs) |
+| Size | small (1 site, 4 customers), medium (2, 8), large (3, 14) |
+| Flows | outbound always; inbound replenishment and production can be switched off |
+| Disruptions | none, low (~2/year), medium (~5), high (~10) from the [catalog](scenarios/README.md#disruption-catalog) |
+| Fine-tuning | demand level, horizon, layout seed, name |
+
+Every scenario can be downloaded as YAML (`GET /scenarios/{name}?format=yaml`),
+edited and uploaded again (`POST /scenarios/upload`). The format is documented in
+[scenarios/README.md](scenarios/README.md); two hand-written templates,
+[`wholesale`](scenarios/wholesale/README.md) and
+[`manufacturing`](scenarios/manufacturing/README.md), are included.
+
+## Replay or continue a dataset
+
+```bash
+# DataCo replayed from its start (2015) as if it happened now
+curl -X POST http://localhost:8000/runs -d '{"scenario": "dataco"}' -H 'content-type: application/json'
+# The last 30 days of DataCo, then a calibrated simulation continues it
+curl -X POST http://localhost:8000/runs -d '{"scenario": "dataco-continued"}' -H 'content-type: application/json'
+# Save the calibrated scenario to run or edit it on its own
+curl -X POST http://localhost:8000/scenarios/calibrate -d '{"window_days": 90}' -H 'content-type: application/json'
+```
+
+The dataset (96 MB, CC BY 4.0) is downloaded on first use. How it is mapped and
+calibrated, and which assumptions that needs: [docs/datasets.md](docs/datasets.md).
+
+## Use the data
 
 | Endpoint | Purpose |
 | --- | --- |
 | `GET /runs`, `POST /runs`, `GET /runs/{id}` | List, start and inspect runs |
 | `POST /runs/{id}/pause`, `/resume` | Pause and resume (applied within 0.5 s) |
-| `GET /shipments` | Shipments; filters `open`, `delayed`, `status`, `expand=order` |
-| `GET /orders` | Orders; filter `status` |
-| `GET /inventory` | Empty in Phase 1 (DataCo has no inventory data) |
+| `POST /runs/{id}/disruptions` | Inject a disruption into a running simulation |
+| `GET /shipments` | Filters `open`, `delayed`, `status`, `expand=order` |
+| `GET /orders`, `GET /inventory`, `GET /disruptions` | Current state of a run |
 | `GET /events` | Event history; filters `type`, `after` |
-| `GET /stream` | SSE stream; filters `run`, `types`; resumes with `Last-Event-ID` |
-| `GET /scenarios`, `GET /health` | Available datasets, health check |
+| `GET /stream` | Server-Sent Events; filters `run`, `types`; resumes with `Last-Event-ID` |
+| `GET /scenarios`, `POST /scenarios`, `/scenarios/upload`, `/scenarios/calibrate` | Scenarios |
+| `GET /builder/options`, `POST /builder/preview` | Scenario builder |
+| `GET /locations`, `/items`, `/lanes`, `/disruption-types` | Master data and catalog |
+| `POST /webhooks`, `GET /webhooks`, `DELETE /webhooks/{id}` | [Webhooks](docs/webhooks.md) |
 
-### Run options
+Run options for `POST /runs`: `scenario`, `seed` (same seed → identical event
+stream), `time_factor` (default 1440), `sample_rate` and `dataset_from`/`dataset_to`
+(replays), `sim_start` (default: now), `paused`.
 
-| Field | Default | Meaning |
-| --- | --- | --- |
-| `time_factor` | 1440 | Simulated seconds per wall-clock second |
-| `seed` | 0 | Seed for sampling; same seed → identical event stream |
-| `sample_rate` | 1.0 | Share of orders to replay |
-| `dataset_from`, `dataset_to` | whole dataset | Replay a window of the dataset |
-| `sim_start` | now | Simulated time that the dataset start maps to |
-| `paused` | false | Create the run paused |
+**Agents:** an [MCP server](docs/mcp.md) gives Claude and other MCP clients tools
+to build scenarios, start runs, read shipments and inject disruptions.
 
 ## How it works
 
 ```
-Inputs (public datasets, later: scenarios, your own data)
-  → Engine (Python): Replay | Simulation (later) | Calibration (later)
+Inputs: datasets, scenario YAML, scenario builder
+  → Engine: Replay | Simulation (SimPy) | Calibration (replay → simulation)
   → PostgreSQL: core schema + append-only event log
-  → Access layer (FastAPI): REST, SSE stream
-  → Consumers: control tower, risk tool, notebooks
+  → Access layer: REST, SSE stream, webhooks, MCP server
+  → Consumers: control tower, risk tool, notebooks, agents
 ```
 
-- **One schema** ([`schema/`](schema/README.md)): Pydantic models, published as
-  JSON Schema, versioned separately (SemVer). Current: v0.1.0.
-- **Append-only event log.** Events: `order.created`, `shipment.departed`,
-  `shipment.delayed`, `shipment.delivered` (more types are defined in the schema).
-  Current state tables are updated in the same transaction as each event.
-- **Reproducible.** Same scenario version + seed + options + engine version →
-  identical event stream (tested in `tests/test_replay.py`).
-- **Local first.** Everything runs with `docker compose up`; no cloud account needed.
+- **One schema** ([`schema/`](schema/README.md)), versioned separately (v0.2.0) and
+  published as JSON Schema. Consumers cannot tell replayed, simulated and
+  calibrated runs apart.
+- **Append-only event log**: `order.created`, `order.confirmed`, `shipment.departed`,
+  `shipment.delayed`, `shipment.eta_changed`, `shipment.delivered`,
+  `inventory.changed`, `inventory.below_safety_stock`, `disruption.started`,
+  `disruption.ended`. Current state tables change in the same transaction.
+- **Reproducible**: same scenario version + seed + options + engine version →
+  identical event stream; an injected disruption changes only what comes after it.
+- **Local first**: everything runs with `docker compose up`.
 
-How DataCo is mapped, and which assumptions that needs, is documented in
-[docs/datasets.md](docs/datasets.md). Design decisions are in [docs/adr/](docs/adr/); the Phase 1 gate results are in
-[docs/phase1-acceptance.md](docs/phase1-acceptance.md).
+Design decisions: [docs/adr/](docs/adr/). Acceptance results:
+[Phase 1](docs/phase1-acceptance.md), [Phase 2](docs/phase2-acceptance.md).
 
 ## Development
 
@@ -109,11 +139,11 @@ Requirements: [uv](https://docs.astral.sh/uv/) and Docker (or a local PostgreSQL
 ```bash
 uv sync
 cp .env.example .env
-docker compose up -d db                       # PostgreSQL only
-uv run python -m adapters.dataco.fetch        # dataset → data/raw/
+docker compose up -d db
 export DATABASE_URL=postgresql://livesim:livesim@localhost:5432/livesim
 uv run python -m engine                       # terminal 1
 uv run uvicorn --factory api.main:create_app  # terminal 2
+uv run python -m api.webhooks                 # terminal 3 (optional)
 ```
 
 Checks (CI runs the same):
@@ -124,18 +154,21 @@ uv run mypy
 uv run pytest          # uses DATABASE_URL, or a temporary local PostgreSQL
 ```
 
-Tests never use the real dataset; they run on a small synthetic fixture.
+Tests never use the real dataset, except `tests/test_soak_dataco.py`, which runs
+only when the dataset is in `data/raw/`.
 
 ## Repository layout
 
 | Folder | Content |
 | --- | --- |
 | `schema/` | Core schema: Pydantic models, JSON Schema, SQL migrations |
-| `engine/` | Replay engine and run control |
-| `adapters/` | Importers that map public datasets to the core schema |
-| `api/` | FastAPI app: REST and SSE stream |
-| `examples/` | [Mini control tower](examples/control-tower/README.md) |
-| `docs/` | Dataset notes, `docs/adr/` for architecture decisions |
+| `engine/` | Replay engine, simulation (`engine/simulation/`), builder, continuation, run control |
+| `scenarios/` | Scenario templates and the scenario format |
+| `adapters/` | Dataset importers and calibration |
+| `api/` | FastAPI app: REST, SSE stream, webhooks, scenarios |
+| `mcp_server/` | MCP server (named so it does not shadow the `mcp` SDK) |
+| `examples/` | [Mini control tower and scenario builder](examples/control-tower/README.md) |
+| `docs/` | Datasets, webhooks, MCP, acceptance results, `docs/adr/` |
 | `data/` | Gitignored; raw downloads go to `data/raw/` |
 
 ## Licensing

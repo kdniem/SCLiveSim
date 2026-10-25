@@ -1,0 +1,718 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kdniem/SCLiveSim/scenarios/scenario.schema.json",
+  "x-spec-version": "0.1.0",
+  "$defs": {
+    "DemandStream": {
+      "additionalProperties": false,
+      "description": "Customer orders for one item, served from one location over one lane.",
+      "properties": {
+        "customer_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Customer Id",
+          "type": "string"
+        },
+        "item_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Item Id",
+          "type": "string"
+        },
+        "ship_from": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Ship From",
+          "type": "string"
+        },
+        "lane_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Lane Id",
+          "type": "string"
+        },
+        "orders_per_day": {
+          "description": "Poisson arrival rate",
+          "exclusiveMinimum": 0,
+          "title": "Orders Per Day",
+          "type": "number"
+        },
+        "quantity_mean": {
+          "exclusiveMinimum": 0,
+          "title": "Quantity Mean",
+          "type": "number"
+        },
+        "quantity_cv": {
+          "default": 0.3,
+          "maximum": 3,
+          "minimum": 0,
+          "title": "Quantity Cv",
+          "type": "number"
+        },
+        "requested_days": {
+          "description": "Customer wants delivery this many days after ordering",
+          "minimum": 0,
+          "title": "Requested Days",
+          "type": "number"
+        }
+      },
+      "required": [
+        "customer_id",
+        "item_id",
+        "ship_from",
+        "lane_id",
+        "orders_per_day",
+        "quantity_mean",
+        "requested_days"
+      ],
+      "title": "DemandStream",
+      "type": "object"
+    },
+    "DisruptionSpec": {
+      "additionalProperties": false,
+      "description": "A scheduled disruption; `type` must be in the disruption catalog.",
+      "properties": {
+        "id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        },
+        "start_day": {
+          "minimum": 0,
+          "title": "Start Day",
+          "type": "number"
+        },
+        "duration_days": {
+          "exclusiveMinimum": 0,
+          "title": "Duration Days",
+          "type": "number"
+        },
+        "severity": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Severity",
+          "type": "number"
+        },
+        "locations": {
+          "items": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "type": "string"
+          },
+          "title": "Locations",
+          "type": "array"
+        },
+        "lanes": {
+          "items": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "type": "string"
+          },
+          "title": "Lanes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "start_day",
+        "duration_days",
+        "severity"
+      ],
+      "title": "DisruptionSpec",
+      "type": "object"
+    },
+    "Item": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "category": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Category"
+        },
+        "unit": {
+          "default": "pcs",
+          "title": "Unit",
+          "type": "string"
+        },
+        "weight_kg": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Weight Kg"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "Item",
+      "type": "object"
+    },
+    "LaneSpec": {
+      "additionalProperties": false,
+      "description": "A transport lane.\n\nActual transit time = planned * lognormal noise with mean `transit_mean_ratio`\nand coefficient of variation `transit_cv`. A ratio below 1 models the buffer\ncarriers build into planned transit times.",
+      "properties": {
+        "id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "origin_location_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Origin Location Id",
+          "type": "string"
+        },
+        "destination_location_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Destination Location Id",
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "road",
+            "sea",
+            "air",
+            "rail"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "planned_transit_days": {
+          "minimum": 0,
+          "title": "Planned Transit Days",
+          "type": "number"
+        },
+        "transit_cv": {
+          "default": 0.15,
+          "description": "Coefficient of variation",
+          "maximum": 2,
+          "minimum": 0,
+          "title": "Transit Cv",
+          "type": "number"
+        },
+        "transit_mean_ratio": {
+          "default": 0.9,
+          "description": "Mean actual / planned",
+          "exclusiveMinimum": 0,
+          "maximum": 3,
+          "title": "Transit Mean Ratio",
+          "type": "number"
+        },
+        "cost": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cost"
+        },
+        "carrier_id": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Carrier Id"
+        },
+        "service": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Service class shown as shipping_mode, e.g. 'First Class'",
+          "title": "Service"
+        }
+      },
+      "required": [
+        "id",
+        "origin_location_id",
+        "destination_location_id",
+        "mode",
+        "planned_transit_days"
+      ],
+      "title": "LaneSpec",
+      "type": "object"
+    },
+    "Location": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/$defs/LocationType"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "country": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Country"
+        },
+        "lat": {
+          "anyOf": [
+            {
+              "maximum": 90,
+              "minimum": -90,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lat"
+        },
+        "lon": {
+          "anyOf": [
+            {
+              "maximum": 180,
+              "minimum": -180,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lon"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "name"
+      ],
+      "title": "Location",
+      "type": "object"
+    },
+    "LocationType": {
+      "enum": [
+        "plant",
+        "warehouse",
+        "port",
+        "customer_site",
+        "supplier_site"
+      ],
+      "title": "LocationType",
+      "type": "string"
+    },
+    "Partner": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/$defs/PartnerRole"
+        },
+        "location_id": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Location Id"
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "role"
+      ],
+      "title": "Partner",
+      "type": "object"
+    },
+    "PartnerRole": {
+      "enum": [
+        "supplier",
+        "customer",
+        "carrier"
+      ],
+      "title": "PartnerRole",
+      "type": "string"
+    },
+    "Production": {
+      "additionalProperties": false,
+      "description": "Make an item at a location from components (bill of materials).",
+      "properties": {
+        "location_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Location Id",
+          "type": "string"
+        },
+        "item_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Item Id",
+          "type": "string"
+        },
+        "components": {
+          "description": "Component item -> qty per unit",
+          "patternProperties": {
+            "^[A-Za-z0-9_.:-]+$": {
+              "type": "number"
+            }
+          },
+          "propertyNames": {
+            "maxLength": 64,
+            "minLength": 1
+          },
+          "title": "Components",
+          "type": "object"
+        },
+        "rate_per_day": {
+          "description": "Maximum output per day",
+          "exclusiveMinimum": 0,
+          "title": "Rate Per Day",
+          "type": "number"
+        },
+        "batch_days": {
+          "default": 1.0,
+          "description": "Production runs every n days",
+          "minimum": 0,
+          "title": "Batch Days",
+          "type": "number"
+        }
+      },
+      "required": [
+        "location_id",
+        "item_id",
+        "components",
+        "rate_per_day"
+      ],
+      "title": "Production",
+      "type": "object"
+    },
+    "StockPolicy": {
+      "additionalProperties": false,
+      "description": "Inventory of one item at one location with an (s, S) reorder policy.",
+      "properties": {
+        "location_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Location Id",
+          "type": "string"
+        },
+        "item_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Item Id",
+          "type": "string"
+        },
+        "initial": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Initial",
+          "type": "number"
+        },
+        "safety_stock": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Safety Stock",
+          "type": "number"
+        },
+        "reorder_point": {
+          "default": 0,
+          "description": "Reorder when on hand + on order <= this",
+          "minimum": 0,
+          "title": "Reorder Point",
+          "type": "number"
+        },
+        "order_up_to": {
+          "default": 1,
+          "exclusiveMinimum": 0,
+          "title": "Order Up To",
+          "type": "number"
+        },
+        "review_days": {
+          "default": 1.0,
+          "description": "Policy is checked every n days",
+          "minimum": 0,
+          "title": "Review Days",
+          "type": "number"
+        },
+        "supplier_id": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Replenish from this supplier",
+          "title": "Supplier Id"
+        },
+        "inbound_lane_id": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Inbound Lane Id"
+        },
+        "supplier_lead_days": {
+          "default": 1.0,
+          "description": "Supplier processing time",
+          "minimum": 0,
+          "title": "Supplier Lead Days",
+          "type": "number"
+        },
+        "unlimited": {
+          "default": false,
+          "description": "Stock is not modelled: always available, no inventory rows or events (for data sources without inventory)",
+          "title": "Unlimited",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "location_id",
+        "item_id"
+      ],
+      "title": "StockPolicy",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "spec_version": {
+      "default": "0.1.0",
+      "title": "Spec Version",
+      "type": "string"
+    },
+    "name": {
+      "pattern": "^[a-z0-9_-]+$",
+      "title": "Name",
+      "type": "string"
+    },
+    "version": {
+      "title": "Version",
+      "type": "string"
+    },
+    "description": {
+      "title": "Description",
+      "type": "string"
+    },
+    "license": {
+      "default": "CC-BY-4.0",
+      "title": "License",
+      "type": "string"
+    },
+    "horizon_days": {
+      "exclusiveMinimum": 0,
+      "maximum": 3650,
+      "title": "Horizon Days",
+      "type": "integer"
+    },
+    "handling_days": {
+      "default": 0.25,
+      "description": "Time from allocation to departure",
+      "minimum": 0,
+      "title": "Handling Days",
+      "type": "number"
+    },
+    "locations": {
+      "items": {
+        "$ref": "#/$defs/Location"
+      },
+      "title": "Locations",
+      "type": "array"
+    },
+    "partners": {
+      "items": {
+        "$ref": "#/$defs/Partner"
+      },
+      "title": "Partners",
+      "type": "array"
+    },
+    "items": {
+      "items": {
+        "$ref": "#/$defs/Item"
+      },
+      "title": "Items",
+      "type": "array"
+    },
+    "lanes": {
+      "items": {
+        "$ref": "#/$defs/LaneSpec"
+      },
+      "title": "Lanes",
+      "type": "array"
+    },
+    "stock": {
+      "items": {
+        "$ref": "#/$defs/StockPolicy"
+      },
+      "title": "Stock",
+      "type": "array"
+    },
+    "demand": {
+      "items": {
+        "$ref": "#/$defs/DemandStream"
+      },
+      "title": "Demand",
+      "type": "array"
+    },
+    "production": {
+      "items": {
+        "$ref": "#/$defs/Production"
+      },
+      "title": "Production",
+      "type": "array"
+    },
+    "disruptions": {
+      "items": {
+        "$ref": "#/$defs/DisruptionSpec"
+      },
+      "title": "Disruptions",
+      "type": "array"
+    }
+  },
+  "required": [
+    "name",
+    "version",
+    "description",
+    "horizon_days",
+    "locations",
+    "partners",
+    "items",
+    "lanes"
+  ],
+  "title": "ScenarioSpec",
+  "type": "object"
+}

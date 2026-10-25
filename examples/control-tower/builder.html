@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Scenario Builder · SC LiveSim</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <h1>Scenario Builder</h1>
+      <span class="sub">Click together your own supply chain simulation</span>
+    </div>
+    <nav class="run"><a class="button-link" href="index.html">Control tower →</a></nav>
+  </header>
+
+  <main class="builder">
+    <form id="form" class="panel builder-form" autocomplete="off">
+      <fieldset>
+        <legend>Industry</legend>
+        <div id="industries" class="cards"></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Region</legend>
+        <div id="regions" class="cards cards-small"></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Size</legend>
+        <div id="sizes" class="segmented"></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>What to simulate</legend>
+        <label class="check"><input type="checkbox" name="outbound" checked disabled> Customer orders and outbound shipments</label>
+        <label class="check"><input type="checkbox" name="inbound" checked> Inbound replenishment from suppliers</label>
+        <label class="check"><input type="checkbox" name="production" checked> Production with bill of materials <span id="production-note" class="muted"></span></label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Disruptions</legend>
+        <div id="disruptions" class="segmented"></div>
+      </fieldset>
+
+      <fieldset class="grid-2">
+        <legend>Fine-tuning</legend>
+        <label>Demand level <output id="demand-out">1.0×</output>
+          <input type="range" name="demand_level" min="0.3" max="3" step="0.1" value="1">
+        </label>
+        <label>Horizon
+          <select name="horizon_days">
+            <option value="90">90 days</option><option value="180">180 days</option>
+            <option value="365" selected>1 year</option><option value="730">2 years</option>
+          </select>
+        </label>
+        <label>Layout seed <input type="number" name="seed" min="0" value="0"></label>
+        <label>Name <input type="text" name="name" placeholder="generated" pattern="[a-z0-9_\-]{3,60}"></label>
+      </fieldset>
+    </form>
+
+    <section class="panel preview">
+      <h2>Preview</h2>
+      <p id="description" class="muted">Choose an industry and a region.</p>
+      <div id="map" class="map" role="img" aria-label="Network map"></div>
+      <div class="legend">
+        <span><i class="dot dot-site"></i>site</span><span><i class="dot dot-cus"></i>customer</span>
+        <span><i class="dot dot-sup"></i>supplier</span><span><i class="line line-sea"></i>sea</span>
+        <span><i class="line line-air"></i>air</span><span><i class="line line-road"></i>road</span>
+      </div>
+      <dl id="figures" class="figures"></dl>
+      <h3>Scheduled disruptions</h3>
+      <ul id="disruption-list" class="disruptions"></ul>
+      <div class="actions">
+        <button id="start" type="button" class="primary">Save &amp; start run</button>
+        <button id="save" type="button">Save only</button>
+        <a id="download" class="button-link" hidden>Download YAML</a>
+      </div>
+      <p id="message" class="message" role="status"></p>
+    </section>
+
+    <section class="panel">
+      <h2>Continue an existing dataset</h2>
+      <p class="muted">Replay the end of a real dataset, then let a simulation calibrated on it
+        continue seamlessly: same products, destinations, shipping classes, order volumes and
+        lateness. The first use loads the dataset (DataCo, 96 MB, CC BY 4.0; about 15 seconds).</p>
+      <div class="grid-2">
+        <label>Dataset
+          <select id="dataset"><option value="dataco">DataCo Smart Supply Chain (2015–2018)</option></select>
+        </label>
+        <label>Calibration window for “save for editing” (days)<input id="window-days" type="number" min="7" max="1100" value="90"></label>
+      </div>
+      <div class="actions">
+        <button id="continue" type="button" class="primary">Replay &amp; continue</button>
+        <button id="calibrate" type="button">Calibrate &amp; save for editing</button>
+        <a id="calibrated-download" class="button-link" hidden>Download YAML</a>
+      </div>
+      <p id="continue-message" class="message" role="status"></p>
+    </section>
+
+    <section class="panel">
+      <h2>Upload your own scenario</h2>
+      <p class="muted">A YAML file in the <a href="https://github.com/kdniem/SCLiveSim/tree/main/scenarios">scenario format</a>, for example an edited download.</p>
+      <input id="upload" type="file" accept=".yaml,.yml,application/yaml,text/yaml">
+      <p id="upload-message" class="message" role="status"></p>
+    </section>
+  </main>
+
+  <footer>
+    API: <a id="api-link" href="#"></a> · Change it with <code>?api=http://host:port</code>
+  </footer>
+  <script src="builder.js"></script>
+</body>
+</html>

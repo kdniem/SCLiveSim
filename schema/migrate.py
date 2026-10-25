@@ -16,11 +16,15 @@ def migration_files() -> list[Path]:
 
 
 def migrate(conn: psycopg.Connection) -> list[str]:
-    """Apply all pending migrations and return the names of those applied."""
-    row = conn.execute("SHOW server_encoding").fetchone()
-    if row is None or row[0] != "UTF8":
-        raise RuntimeError(f"database encoding must be UTF8, not {row[0] if row else '?'}")
+    """Apply all pending migrations and return the names of those applied.
+
+    Runs in its own transaction and leaves none open, so the advisory lock is
+    released when it returns (call it on a connection without an open transaction).
+    """
     with conn.transaction():
+        row = conn.execute("SHOW server_encoding").fetchone()
+        if row is None or row[0] != "UTF8":
+            raise RuntimeError(f"database encoding must be UTF8, not {row[0] if row else '?'}")
         # Serialize concurrent migrators (e.g. engine and API starting together).
         conn.execute("SELECT pg_advisory_xact_lock(hashtext('sc_livesim_migrate'))")
         conn.execute(

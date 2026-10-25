@@ -14,9 +14,9 @@ from psycopg.types.json import Jsonb
 
 from engine import ENGINE_VERSION
 from engine.clock import Clock
-from engine.scenarios import SCENARIOS
+from engine.scenarios import get_scenario
 from schema import SCHEMA_VERSION
-from schema.enums import RunMode, RunStatus
+from schema.enums import RunStatus
 
 MAX_TIME_FACTOR = 1_000_000.0
 
@@ -33,8 +33,6 @@ class RunOptions:
     paused: bool = False
 
     def validate(self) -> None:
-        if self.scenario not in SCENARIOS:
-            raise ValueError(f"unknown scenario {self.scenario!r}; known: {sorted(SCENARIOS)}")
         if not 0 < self.time_factor <= MAX_TIME_FACTOR:
             raise ValueError(f"time_factor must be in (0, {MAX_TIME_FACTOR:g}]")
         if not 0 < self.sample_rate <= 1:
@@ -72,7 +70,9 @@ def create_run(conn: psycopg.Connection, options: RunOptions, clock: Clock) -> s
     """Insert a new replay run; the engine starts it on its next tick."""
     options.validate()
     sim_start = (options.sim_start or clock.now()).replace(microsecond=0)
-    scenario = SCENARIOS[options.scenario]
+    scenario = get_scenario(conn, options.scenario)
+    if scenario is None:
+        raise ValueError(f"unknown scenario {options.scenario!r}; see GET /scenarios")
     with conn.transaction():
         run_id = _next_run_id(conn)
         conn.execute(
@@ -80,7 +80,7 @@ def create_run(conn: psycopg.Connection, options: RunOptions, clock: Clock) -> s
             " sim_start, wall_start, status, engine_version, schema_version)"
             " VALUES (%s, %s, %s, %s, %s, %s, %s, NULL, %s, %s, %s)",
             (
-                run_id, RunMode.REPLAY.value, scenario.name, scenario.version, options.seed,
+                run_id, scenario.mode.value, scenario.name, scenario.version, options.seed,
                 options.time_factor, sim_start, RunStatus.CREATED.value, ENGINE_VERSION,
                 SCHEMA_VERSION,
             ),
@@ -120,3 +120,82 @@ def get_runs(conn: psycopg.Connection, run_id: str | None = None) -> list[dict[s
             params,
         )
         return cur.fetchall()
+
+
+class RunNotFound(LookupError):
+    pass
+
+
+class RunStateError(ValueError):
+    pass
+
+
+def inject_disruption(
+    conn: psycopg.Connection,
+    run_id: str,
+    *,
+    type: str,
+    severity: float,
+    duration_days: float,
+    locations: list[str] | None = None,
+    lanes: list[str] | None = None,
+    start: datetime | None = None,
+) -> str:
+    """Queue a disruption for a running simulation; the engine applies it next tick.
+
+    The disruption starts at `start` (simulated time) or, if that has already
+    passed when the engine applies it, right away. Returns the disruption ID.
+    """
+    from engine.simulation.catalog import CATALOG
+    from engine.simulation.spec import DisruptionSpec
+
+    with conn.transaction():
+        row = conn.execute(
+            "SELECT r.scenario, r.status, r.sim_start, c.options FROM sim_run r"
+            " JOIN run_control c ON c.sim_run_id = r.id WHERE r.id = %s FOR UPDATE OF c",
+            (run_id,),
+        ).fetchone()
+        if row is None:
+            raise RunNotFound(run_id)
+        scenario_name, status, sim_start, options = row
+        scenario = get_scenario(conn, scenario_name)
+        if scenario is None or not scenario.supports_disruptions:
+            raise RunStateError(f"scenario {scenario_name!r} does not support disruptions")
+        if status in ("finished", "failed"):
+            raise RunStateError(f"run {run_id} is {status}")
+        if type not in CATALOG:
+            raise ValueError(f"unknown disruption type {type!r}; known: {sorted(CATALOG)}")
+        targets = CATALOG[type].targets
+        if targets == "lanes" and not lanes:
+            raise ValueError(f"{type} needs at least one lane")
+        if targets == "locations" and not locations:
+            raise ValueError(f"{type} needs at least one location")
+        spec = scenario.spec()
+        unknown = [x for x in (lanes or []) if x not in {ln.id for ln in spec.lanes}]
+        unknown += [x for x in (locations or []) if x not in {loc.id for loc in spec.locations}]
+        if unknown:
+            raise ValueError(f"unknown lanes/locations in this scenario: {unknown}")
+        existing = len(options.get("disruptions", [])) + len(options.get("pending_disruptions", []))
+        disruption_id = f"DIS-INJ-{existing + 1:03d}"
+        requested = None
+        if start is not None:
+            if start.utcoffset() is None:
+                raise ValueError("start must be timezone-aware")
+            requested = (start - sim_start).total_seconds() / 86400
+        pending = DisruptionSpec(
+            id=disruption_id,
+            type=type,
+            start_day=max(requested or 0.0, 0.0),
+            duration_days=duration_days,
+            severity=severity,
+            locations=locations or [],
+            lanes=lanes or [],
+        ).model_dump()
+        pending["requested_start_day"] = requested
+        conn.execute(
+            "UPDATE run_control SET options = jsonb_set(options, '{pending_disruptions}',"
+            " coalesce(options->'pending_disruptions', '[]'::jsonb) || %s::jsonb),"
+            " updated_at = now() WHERE sim_run_id = %s",
+            (Jsonb([pending]), run_id),
+        )
+    return disruption_id
